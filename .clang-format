@@ -63,7 +63,9 @@ IncludeBlocks: Preserve
 
 # 不重排注释, 避免破坏中文注释的排版.
 ReflowComments: false
-AlignTrailingComments: false
+
+# 行尾注释对齐, 与 AGENTS.md 第 8.3 节的示例一致.
+AlignTrailingComments: true
 
 # 连续赋值与宏按块对齐, 与 AGENTS.md 第 4.1, 4.2 节的表格一致.
 AlignConsecutiveAssignments: Consecutive
@@ -72,6 +74,9 @@ AlignConsecutiveDeclarations: false
 
 # 行宽.
 ColumnLimit: 100
+
+# 续行反斜杠紧跟内容, 不顶到行宽边界.
+AlignEscapedNewlines: Left
 
 # 其他.
 IndentCaseLabels: false

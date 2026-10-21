@@ -141,7 +141,8 @@ log/          可选日志基础设施
 
 - 只依赖 C 标准库与 `stdint.h`, `stddef.h`, `stdbool.h`.
 - 不包含 HAL, 不包含 CMSIS, 不包含 RTOS 头文件.
-- 提供 `NERV_StatusTypeDef`, 通用类型, 错误码, 数学函数, 单位转换与通用宏.
+- 提供 `NERV_StatusTypeDef`, 错误码, 数学函数, 单位转换与通用宏.
+- 提供确实被多个模块使用的通用类型, 例如 `NERV_AttitudeTypeDef`. 只有单一模块使用的类型放在该模块的头文件中, 带模块前缀.
 - 不得包含 `module/` 或 `bsp/` 的头文件.
 
 ### 3.2 config
@@ -304,11 +305,15 @@ _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
 
 ### 5.2 坐标系
 
-- 右手系, `x` 轴指向机器人正前方, `y` 轴指向左方, `z` 轴指向上方, 与 REP-103 一致.
+- 右手系, `x` 轴指向机器人正前方, `y` 轴指向左方, `z` 轴指向上方, 与 REP-103 的机体坐标系约定一致.
 - yaw 绕 `z` 轴, 逆时针为正, 从上向下俯视.
 - pitch 绕 `y` 轴, 抬头为正.
 - roll 绕 `x` 轴, 右侧下沉为正.
-- 位姿结构体的每个字段必须在定义处用 `/**< ... */` 注明轴向与正方向.
+- 位置与速度分属不同参考系. 位置在参考系中累积, 速度在机体系中表达, 与 ROS `nav_msgs/Odometry` 的 `pose` 与 `twist` 处理一致. 换算到参考系需要航向角, 由调用方完成.
+- 遥控器给出的底盘速度指令在云台系, 即操作手视角, 云台指向的方向为正前方. 它与底盘解算所用的机体系相差一个绕 z 轴的旋转, 角度为云台航向与底盘航向之差, 两个航向必须在同一参考系下测量.
+- 底盘接口只接受机体系速度. 遥控器指令到机体系的转换由调用方完成, 因为"底盘相对云台, 相对车体还是相对场地"是机器人级策略, 库不替使用者选定. 绕 z 轴的角速度不随参考系改变, 转换时原样传递.
+- 姿态用欧拉角表示, 不采用 REP-103 推荐的旋转矩阵或四元数. 嵌入式控制需要直接的角度值, 不做坐标变换.
+- 姿态结构体的每个字段必须在定义处用 `/**< ... */` 注明轴向与正方向.
 
 ### 5.3 角度范围
 
@@ -339,7 +344,7 @@ float NERV_Unit_RadpsToRpm(float radps);
 | --- | --- | --- |
 | 公开函数 | `NERV_<Module>_<Verb><Noun>` | `NERV_Chassis_Init` |
 | 公共工具函数 | `NERV_Math_`, `NERV_Unit_`, `NERV_Ptr_` | `NERV_Math_WrapPi` |
-| 公共工具宏 | `NERV_<NAME>`, 仅限 `public/Inc/nerv_utils.h` | `NERV_ARRAY_SIZE`, `NERV_TIMEOUT_MS` |
+| 公共工具宏 | `NERV_UTILS_<NAME>`, 仅限 `public/Inc/nerv_utils.h` | `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS` |
 | 初始化与注册 | `NERV_<Module>_Register`, 首参数为实例指针 | `NERV_Chassis_Register` |
 | 实例类型 | `NERV_<Module>_InstanceTypeDef` | `NERV_Chassis_InstanceTypeDef` |
 | 配置类型 | `NERV_<Module>_ConfigTypeDef` | `NERV_Chassis_ConfigTypeDef` |
@@ -385,7 +390,7 @@ for (uint8_t i = 0U; i < motor_num; i++)
 }
 ```
 
-仓库根目录的 `.clang-format` 是格式化的唯一基准. 源文件与头文件必须与该配置的输出一致, IDE 与命令行使用同一份配置. 规范中的代码样例同样取自该配置的输出.
+仓库根目录的 `.clang-format` 是格式化的唯一基准. 源文件与头文件必须与该配置的输出一致, IDE 与命令行使用同一份配置. 规范中的代码样例是示意片段, 只展示结构与语义, 不要求与配置输出逐字一致.
 
 ### 7.2 字面量后缀与常量在左
 
@@ -434,8 +439,8 @@ if (NULL == hchassis)          { /* ... */ }
 - 硬件寄存器值放在 `bsp/<platform>/Inc/*_reg.h`.
 - 协议常量放在 `module/<name>/Inc/*_def.h`.
 - 可调参数放在 `config/Inc/config.h` 或模块的默认参数头文件.
-- 超时使用 `NERV_TIMEOUT_MS(x)` 或 `NERV_TIMEOUT_S(x)`, 禁止裸数字.
-- 数组长度使用 `NERV_ARRAY_SIZE(array)`.
+- 超时使用 `NERV_UTILS_TIMEOUT_MS(x)` 或 `NERV_UTILS_TIMEOUT_S_TO_MS(x)`, 禁止裸数字. 宏名必须写明输入单位与输出单位, 避免"名字是秒, 结果是毫秒"这类歧义.
+- 数组长度使用 `NERV_UTILS_ARRAY_SIZE(array)`.
 
 ```c
 /* 反例 */
@@ -443,7 +448,7 @@ NERV_FDCAN_Transmit(hfdcan, data, 8U, 5U);
 
 /* 正例 */
 NERV_FDCAN_Transmit(hfdcan, data, frame_len,
-                    NERV_TIMEOUT_MS(NERV_FDCAN_TX_TIMEOUT_MS));
+                    NERV_UTILS_TIMEOUT_MS(NERV_FDCAN_TX_TIMEOUT_MS));
 ```
 
 ### 7.5 宏与枚举的选择
@@ -634,12 +639,12 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 - `_level`, `_file`, `_line` 与 `__VA_ARGS__` 只求值一次.
 - 宏体内没有 `return`, `goto` 或 `continue`.
 
-`public/Inc/nerv_utils.h` 中的 `NERV_ARRAY_SIZE`, `NERV_ALIGN_UP`, `NERV_TIMEOUT_MS` 是单表达式宏:
+`public/Inc/nerv_utils.h` 中的 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS` 是单表达式宏:
 
 - 整个展开体加外层括号.
 - 形参每次出现都加括号.
 - 不需要 `do { ... } while (0)`.
-- `NERV_ARRAY_SIZE` 与 `NERV_ALIGN_UP` 的形参可能出现多次, 必须用 `@warning` 禁止副作用实参.
+- `NERV_UTILS_ARRAY_SIZE` 的形参可能出现多次, 必须用 `@warning` 禁止副作用实参.
 
 ### 7.8 宏保护与命名空间
 
@@ -912,10 +917,10 @@ typedef struct NERV_Chassis_Instance
     NERV_StatusTypeDef (*init)(struct NERV_Chassis_Instance *self);
     NERV_StatusTypeDef (*update)(
         struct NERV_Chassis_Instance *self,
-        const NERV_VelocityTypeDef *target);
+        const NERV_Chassis_VelocityTypeDef *target);
     void (*get_odometry)(
         const struct NERV_Chassis_Instance *self,
-        NERV_OdometryTypeDef *odom);
+        NERV_Chassis_OdometryTypeDef *odom);
 
     void *priv;  /**< 指向调用者提供的静态私有数据 */
 } NERV_Chassis_InstanceTypeDef;

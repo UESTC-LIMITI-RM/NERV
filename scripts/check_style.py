@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 NERV Contributors
+# SPDX-License-Identifier: MIT
 """Check NERV text files for encoding, line ending, tabs, trailing whitespace and punctuation rules."""
 
 from __future__ import annotations

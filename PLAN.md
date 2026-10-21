@@ -124,13 +124,13 @@ _Static_assert((int)NERV_CHASSIS_TYPE_MECANUM == (int)NERV_CHASSIS_TYPE_MECANUM_
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM)
 static void NERV_Chassis_SolveMecanum(NERV_Chassis_InstanceTypeDef *self,
-                                       const NERV_VelocityTypeDef *target);
+                                       const NERV_Chassis_VelocityTypeDef *target);
 #elif (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
 static void NERV_Chassis_SolveOmni(NERV_Chassis_InstanceTypeDef *self,
-                                    const NERV_VelocityTypeDef *target);
+                                    const NERV_Chassis_VelocityTypeDef *target);
 #else
 static void NERV_Chassis_SolveSteering(NERV_Chassis_InstanceTypeDef *self,
-                                        const NERV_VelocityTypeDef *target);
+                                        const NERV_Chassis_VelocityTypeDef *target);
 #endif
 ```
 
@@ -171,10 +171,10 @@ public/Src/nerv_unit.c
 ```
 
 - [x] `nerv_status.h`: 定义 `NERV_StatusTypeDef` 与 `AGENTS.md` 第 4.2 节的全部扩展错误码, 错误码只在这里定义.
-- [ ] `nerv_types.h`: 定义通用结构体, 至少含位姿, 速度与里程计, 字段注明轴向与正方向.
-- [ ] `nerv_types.h`: 提供底盘速度结构, 字段使用 SI 单位后缀, 与 `AGENTS.md` 第 5.1 节一致.
-- [ ] `nerv_utils.h`: 提供 `NERV_ARRAY_SIZE`, `NERV_ALIGN_UP`, `NERV_TIMEOUT_MS`, `NERV_TIMEOUT_S`.
+- [x] `nerv_types.h`: 定义 `NERV_AttitudeTypeDef`, 供底盘航向与装有 IMU 的模块共用. 只含三个角度, 字段注明轴向与正方向, 使用 SI 单位后缀.
+- [x] `nerv_utils.h`: 提供 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS`. 宏名写明输入与输出单位.
 - [ ] `nerv_math.c`: 实现 `NERV_Math_WrapPi`, `NERV_Math_Wrap2Pi`, `NERV_Math_IsClose` 与限幅, 死区函数. 角度归一化只在这里实现.
+- [ ] `nerv_math.c`: 实现绕 z 轴的二维旋转, 把云台系的底盘速度指令转到机体系. 角速度分量原样传递.
 - [ ] `nerv_unit.c`: 实现 `NERV_Unit_RpmToRadps` 与 `NERV_Unit_RadpsToRpm`.
 - [ ] 头文件自包含, 可被 C 与 C++ 编译器包含.
 - [ ] 每个对外函数写完整 Doxygen, 头文件只保留一行 `@brief`.
@@ -235,7 +235,7 @@ module/motor/Src/nerv_motor.c
 - [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`.
 - [ ] 电流指令按可配置上限限幅, 限幅值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中. 过流由电调自身保护兜底, 库不设过流错误位.
 - [ ] 提供 `NERV_Motor_EnterSafeState`, 清零目标值与输出.
-- [ ] 通信超时判定使用 `NERV_TIMEOUT_MS`, 阈值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中.
+- [ ] 通信超时判定使用 `NERV_UTILS_TIMEOUT_MS`, 阈值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中.
 - [ ] 模块层只通过 `NERV_FDCAN_InstanceTypeDef` 发送, 不接触寄存器.
 
 ### M5 `module/chassis/`
@@ -249,6 +249,8 @@ module/chassis/Inc/nerv_chassis_priv.h
 module/chassis/Src/nerv_chassis.c
 ```
 
+- [ ] `nerv_chassis.h`: 定义机体系速度与里程计两个公开类型, 字段注明轴向与正方向, 使用 SI 单位后缀. 姿态复用 `public/Inc/nerv_types.h` 的 `NERV_AttitudeTypeDef`.
+- [ ] 底盘接口只接受机体系速度. 遥控器的云台系指令由调用方转换, 转换用 `NERV_Math_` 的绕 z 轴旋转.
 - [ ] 按第 3 节模板落 `NERV_CHASSIS_TYPE` 宏, 枚举镜像与 `_Static_assert` 校验.
 - [ ] 轮数等派生宏按 `#if` 链推导, 并用 `#if defined(...)` 加 `#error` 禁止使用者覆盖.
 - [ ] 轮径, 轮距, 减速比, 最大轮速等可调项用 `#ifndef` 包裹并给出范围检查.

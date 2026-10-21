@@ -1,0 +1,18 @@
+# 编译产物
+build/
+*.o
+*.a
+*.d
+*.map
+
+# Python
+__pycache__/
+*.pyc
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+

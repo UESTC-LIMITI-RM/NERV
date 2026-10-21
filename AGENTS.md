@@ -199,10 +199,10 @@ log/          可选日志基础设施
 
 typedef enum
 {
-    NERV_OK      = 0x00U,  /**< 操作成功 */
-    NERV_ERROR   = 0x01U,  /**< 通用错误 */
-    NERV_BUSY    = 0x02U,  /**< 资源忙, 稍后重试 */
-    NERV_TIMEOUT = 0x03U,  /**< 操作超时 */
+    NERV_OK      = 0x00U, /**< 操作成功 */
+    NERV_ERROR   = 0x01U, /**< 通用错误 */
+    NERV_BUSY    = 0x02U, /**< 资源忙, 稍后重试 */
+    NERV_TIMEOUT = 0x03U, /**< 操作超时 */
 } NERV_StatusTypeDef;
 
 #endif /* NERV_STATUS_H */
@@ -213,47 +213,48 @@ typedef enum
 扩展错误码采用位掩码语义. 高 8 位为域号, 低 24 位为域内错误位. 使用 `#define` 与固定宽度无符号整型, 不使用 `enum`, 因为调用者需要对错误位做按位或.
 
 ```c
-#define NERV_ERR_NONE                  0x00000000U
-#define NERV_ERR_ALL                   0xFFFFFFFFU
+#define NERV_ERR_NONE 0x00000000U
+#define NERV_ERR_ALL  0xFFFFFFFFU
 
-#define NERV_ERR_DOMAIN_COMMON         0x00U
-#define NERV_ERR_DOMAIN_FDCAN          0x01U
-#define NERV_ERR_DOMAIN_MOTOR          0x02U
-#define NERV_ERR_DOMAIN_CHASSIS        0x03U
-#define NERV_ERR_DOMAIN_GIMBAL         0x04U
-#define NERV_ERR_DOMAIN_SHOOT          0x05U
-#define NERV_ERR_DOMAIN_SAFETY         0x06U
+#define NERV_ERR_DOMAIN_COMMON  0x00U
+#define NERV_ERR_DOMAIN_FDCAN   0x01U
+#define NERV_ERR_DOMAIN_MOTOR   0x02U
+#define NERV_ERR_DOMAIN_CHASSIS 0x03U
+#define NERV_ERR_DOMAIN_GIMBAL  0x04U
+#define NERV_ERR_DOMAIN_SHOOT   0x05U
+#define NERV_ERR_DOMAIN_SAFETY  0x06U
 
-#define NERV_ERR_DOMAIN(_domain)       ((uint32_t)(_domain) << 24U)
-#define NERV_ERR_BIT(_bit)             ((uint32_t)1U << (_bit))
+#define NERV_ERR_DOMAIN(_domain) ((uint32_t)(_domain) << 24U)
+#define NERV_ERR_BIT(_bit)       ((uint32_t)1U << (_bit))
 
-#define NERV_ERR_INVALID_PARAM         (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(0U))
-#define NERV_ERR_NULL_PTR              (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(1U))
-#define NERV_ERR_NOT_INITIALIZED       (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(2U))
-#define NERV_ERR_NO_MEMORY             (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(3U))
-#define NERV_ERR_OUT_OF_RANGE          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(4U))
-#define NERV_ERR_NOT_SUPPORTED         (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(5U))
+#define NERV_ERR_COMMON_INVALID_PARAM   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(0U))
+#define NERV_ERR_COMMON_NULL_PTR        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(1U))
+#define NERV_ERR_COMMON_NOT_INITIALIZED (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(2U))
+#define NERV_ERR_COMMON_NO_MEMORY       (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(3U))
+#define NERV_ERR_COMMON_OUT_OF_RANGE    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(4U))
+#define NERV_ERR_COMMON_NOT_SUPPORTED   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(5U))
 
-#define NERV_FDCAN_ERR_FILTER          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(0U))
-#define NERV_FDCAN_ERR_TX_MAILBOX      (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(1U))
-#define NERV_FDCAN_ERR_RX_OVERRUN      (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(2U))
+#define NERV_ERR_FDCAN_FILTER     (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(0U))
+#define NERV_ERR_FDCAN_TX_MAILBOX (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(1U))
+#define NERV_ERR_FDCAN_RX_OVERRUN (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(2U))
 
-#define NERV_MOTOR_ERR_OFFLINE         (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(0U))
-#define NERV_MOTOR_ERR_OVER_CURRENT    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(1U))
-#define NERV_MOTOR_ERR_OVER_TEMP       (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(2U))
+#define NERV_ERR_MOTOR_OFFLINE   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(0U))
+#define NERV_ERR_MOTOR_OVER_TEMP (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(1U))
 
-#define NERV_CHASSIS_ERR_KINEMATICS    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(0U))
-#define NERV_CHASSIS_ERR_WHEEL_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(1U))
+#define NERV_ERR_CHASSIS_KINEMATICS    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(0U))
+#define NERV_ERR_CHASSIS_WHEEL_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(1U))
 
-#define NERV_GIMBAL_ERR_LIMIT          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(0U))
-#define NERV_GIMBAL_ERR_OFFLINE        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(1U))
+#define NERV_ERR_GIMBAL_LIMIT   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(0U))
+#define NERV_ERR_GIMBAL_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(1U))
 
-#define NERV_SHOOT_ERR_JAM             (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(0U))
-#define NERV_SHOOT_ERR_OFFLINE         (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(1U))
+#define NERV_ERR_SHOOT_JAM     (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(0U))
+#define NERV_ERR_SHOOT_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(1U))
 
-#define NERV_SAFETY_ERR_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
-#define NERV_SAFETY_ERR_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
+#define NERV_ERR_SAFETY_ESTOP   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
+#define NERV_ERR_SAFETY_LATCHED (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
 ```
+
+上表只列名称与取值. `public/Inc/nerv_status.h` 中每个宏单独带一段文档块, 写明语义, 使任意宏都能被 `@ref` 引用. 参数的可选值列表按第 8.7 节书写.
 
 ### 4.3 规则
 
@@ -267,13 +268,15 @@ void     NERV_<Module>_ClearError(NERV_<Module>_InstanceTypeDef *self, uint32_t 
 
 - `GetError` 返回粘滞位掩码, `0U` 表示无错误. 读取本身不清除错误.
 - `ClearError` 只清除 `mask` 中置位的错误. `NERV_ERR_ALL` 只用于清除, 不作为 `GetError` 的返回值.
+- `ClearError` 不处理 `NERV_ERR_SAFETY_ESTOP`. 该位只由 `NERV_Safety_ClearEStop` 清除, 避免全清操作绕过急停保护.
 - 错误位在中断中置位, 在任务中清除时必须使用临界区或原子位操作.
 - 错误码集中定义在 `public/Inc/nerv_status.h`. 禁止在模块头文件中散落定义.
+- 错误码名称统一为 `NERV_ERR_<DOMAIN>_<CONTENT>`, 域名与具体内容之间用下划线连接. 域号宏 `NERV_ERR_DOMAIN_<DOMAIN>` 是例外, 它表示域编号本身, 不是错误码.
 - 全局服务模块, 例如日志模块, 通过返回值报告错误, 不提供实例错误寄存器.
 - `config/Src/config_check.c` 使用 `_Static_assert` 检查域号与位号不冲突.
 
 ```c
-_Static_assert(NERV_ERR_INVALID_PARAM != NERV_ERR_NULL_PTR,
+_Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
                "common error bits must be distinct.");
 ```
 
@@ -343,7 +346,7 @@ float NERV_Unit_RadpsToRpm(float radps);
 | 枚举类型 | `NERV_<Module>_<Name>TypeDef` | `NERV_Chassis_KindTypeDef` |
 | 枚举成员 | `NERV_<MODULE>_<NAME>`, 必须显式赋值 | `NERV_CHASSIS_TYPE_MECANUM = 1U` |
 | 回调类型 | `NERV_<Module>_<Event>CallbackTypeDef` | `NERV_Chassis_FaultCallbackTypeDef` |
-| 位掩码与宏常量 | `NERV_<MODULE>_<NAME>` | `NERV_ERR_INVALID_PARAM` |
+| 位掩码与宏常量 | `NERV_<MODULE>_<NAME>` | `NERV_ERR_COMMON_INVALID_PARAM` |
 | 用户可覆盖的默认值宏 | `NERV_<MODULE>_<NAME>`, 用 `#ifndef` 包裹 | `NERV_MOTOR_MAX_CURRENT_MA` |
 | 用户禁止覆盖的推导宏 | `NERV_<MODULE>_<NAME>`, 用 `#if defined(...)` 与 `#error` 保护 | `NERV_CHASSIS_WHEEL_COUNT` |
 | 内部实现宏 | `__NERV_<MODULE>_<NAME>`, 仅限 `*_priv.h` 或 `.c` | `__NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT` |
@@ -382,6 +385,8 @@ for (uint8_t i = 0U; i < motor_num; i++)
 }
 ```
 
+仓库根目录的 `.clang-format` 是格式化的唯一基准. 源文件与头文件必须与该配置的输出一致, IDE 与命令行使用同一份配置. 规范中的代码样例同样取自该配置的输出.
+
 ### 7.2 字面量后缀与常量在左
 
 - 无符号字面量加 `U` 后缀, 例如 `0U`, `1U`, `0xFFU`.
@@ -404,7 +409,7 @@ if (NULL == hchassis)          { /* ... */ }
 - 不等式比较 `<`, `>`, `<=`, `>=`.
 - 布尔变量判断, 例如 `if (is_ready)`.
 - 浮点数相等比较. 浮点比较必须使用容差函数, 例如 `NERV_Math_IsClose`.
-- 位掩码测试, 例如 `if (0U != (fault & NERV_CHASSIS_ERR_KINEMATICS))`.
+- 位掩码测试, 例如 `if (0U != (fault & NERV_ERR_CHASSIS_KINEMATICS))`.
 - `switch` 的 `case` 标签.
 
 ### 7.3 函数长度与参数
@@ -704,16 +709,24 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 
 ```c
 /* ========================================================================== */
-/* 以下宏为 NERV 核心契约, 禁止修改.                                        */
-/* 修改必须同步更新文档与遥测协议定义.                                      */
+/* 以下定义为 NERV 核心契约, 禁止修改.                                      */
+/* 作用域: NERV_StatusTypeDef 与全部 NERV_ERR_ 开头的宏, 直至文件末尾.      */
+/* 修改必须同步更新 AGENTS.md 与遥测协议定义.                               */
 /* ========================================================================== */
 
-#define __NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT  4U
+#define __NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT 4U
 
 /* ========================================================================== */
-/* 核心契约宏定义区结束                                                     */
+/* 核心契约定义区结束                                                       */
 /* ========================================================================== */
 ```
+
+规则:
+
+- 起始横幅必须写明作用域, 不能只写"以下宏". 作用域用符号名描述, 不写行号, 行号会随改动漂移.
+- 定义区必须有结束横幅闭合, 位置在最后一条核心定义之后.
+- 作用域覆盖非宏定义时, 横幅措辞用"定义"而不是"宏".
+- 起始横幅紧跟文件头与包含语句, 保证读者先看到边界再看内容.
 
 ### 7.9 扩展点
 
@@ -820,6 +833,68 @@ NERV_StatusTypeDef NERV_Chassis_Init(
 - 关键宏定义区的禁止修改边界.
 
 行内注释使用 `/* ... */`, 不使用 `//`.
+
+### 8.6 文件头
+
+每个源文件与头文件必须带文件头. 文件头位于文件第一处, 在 include guard 之前.
+
+C 文件模板:
+
+```c
+/**
+  * @file    nerv_status.h
+  * @brief   NERV 状态码与扩展错误码.
+  * @version 1.0.0
+  * @date    2026-10-21
+  * @copyright Copyright (c) 2026 NERV Contributors
+  *
+  * SPDX-License-Identifier: MIT
+  */
+```
+
+Python 脚本模板:
+
+```python
+#!/usr/bin/env python3
+# Copyright (c) 2026 NERV Contributors
+# SPDX-License-Identifier: MIT
+"""脚本职责说明."""
+```
+
+规则:
+
+- `@file` 与文件名一致, 不写目录.
+- `@brief` 一句话说明文件职责, 不重复文件内容.
+- `@version` 使用语义化版本. 新建文件为 `1.0.0`, 接口或行为变化时递增.
+- `@date` 使用 `YYYY-MM-DD`, 取最后一次实质修改日期.
+- `@copyright` 与仓库根目录 `LICENSE` 一致, 统一为 `Copyright (c) 2026 NERV Contributors`. 不写个人姓名与个人邮箱.
+- 许可证标识用独立一行的 `SPDX-License-Identifier: MIT` 表示, 不写 Doxygen 标签.
+- 禁止使用 `@license`. Doxygen 没有内置的 `\license` 命令, 未知命令按普通文本处理并产生告警.
+- 文件头只写 Doxygen 标签与版权信息. 不写 TODO, 不写临时说明, 不写生成标记.
+- 脚本的 shebang 必须在第一行, 版权行紧随其后.
+
+### 8.7 参数可选值列表
+
+参数有有限个可选值时, 在 `@param` 中用 `@arg` 逐条列出, 值的引用用 `@ref`. 与 ST HAL 的写法一致.
+
+```c
+/**
+  * @brief  由域号生成错误码的域号段.
+  * @param  _domain: 域号, 可取以下值:
+  *                @arg @ref NERV_ERR_DOMAIN_COMMON 公共域.
+  *                @arg @ref NERV_ERR_DOMAIN_FDCAN FDCAN 域.
+  * @return 域号位于高 8 位, 低 24 位为 0 的掩码.
+  */
+#define NERV_ERR_DOMAIN(_domain) ((uint32_t)(_domain) << 24U)
+```
+
+规则:
+
+- 只用 `@ref` 引用已登记的符号. 不用 `@group`, `@group` 用于组织文档分组, 不能引用取值.
+- 被 `@ref` 引用的宏必须自己带文档块. 多个宏共用一个文档块时, Doxygen 只登记块后紧邻的那一个, 其余引用会报 `unable to resolve reference`.
+- 列表项的说明写清语义, 不重复宏名.
+- 取值是枚举类型时, 直接引用类型, 例如 `This parameter can be a value of @ref SPI_Mode`.
+- 掩码类宏的 `@brief` 写明产出的是掩码, `@return` 描述结果. 不写"生成错误位"这类会被理解成产生具体错误的措辞.
 
 ---
 
@@ -1863,12 +1938,18 @@ NERV_StatusTypeDef NERV_<Module>_EnterSafeState(
 安全域使用 `NERV_ERR_DOMAIN_SAFETY`:
 
 ```c
-#define NERV_SAFETY_ERR_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
-#define NERV_SAFETY_ERR_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
+#define NERV_ERR_SAFETY_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
+#define NERV_ERR_SAFETY_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
 ```
 
-- `NERV_SAFETY_ERR_ESTOP` 表示急停输入或软件急停有效.
-- `NERV_SAFETY_ERR_LATCHED` 表示安全状态已锁存, 需要显式复位.
+- `NERV_ERR_SAFETY_ESTOP` 表示软件急停已触发并锁存, 等待显式复位.
+- `NERV_ERR_SAFETY_LATCHED` 表示安全状态已锁存, 需要显式复位.
+
+置位与清除:
+
+- `NERV_ERR_SAFETY_ESTOP` 只由 `NERV_Safety_TriggerEStop` 置位, 只由 `NERV_Safety_ClearEStop` 清除. `ClearError` 不处理该位.
+- `NERV_ERR_SAFETY_LATCHED` 在进入安全状态时置位, 显式复位时清除.
+- 硬件急停回路直接切断执行器供电, 由使用者负责. 库只接收急停已触发这一事件, 不读取硬件急停输入.
 
 ---
 
@@ -1962,6 +2043,7 @@ docs(agents): define library-only repository boundary
 
 - 运行 `python3 scripts/check_style.py .`.
 - 运行 `git diff --check`.
+- 改动过的源文件与头文件用 `clang-format` 检查无差异, 或先用 `clang-format -i` 格式化.
 - 确认没有构建产物, IDE 文件, 测试工程或临时文件进入暂存区.
 - 确认提交信息与实际修改一致.
 
@@ -2026,6 +2108,7 @@ docs(agents): define library-only repository boundary
 - 文本文件为 UTF-8 无 BOM, LF 换行, 文件末尾一个换行.
 - 无 Tab, 无行尾空白, 无 NBSP, 无零宽字符.
 - 中文正文使用半角标点, 无 emoji.
+- 每个源文件与头文件带文件头, 版权行与 `LICENSE` 一致.
 - `python3 scripts/check_style.py .` 通过.
 - `git diff --check` 通过.
 - 提交信息符合第 19 节.

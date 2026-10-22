@@ -56,10 +56,12 @@ NERV/
 │   │   ├── nerv_status.h
 │   │   ├── nerv_types.h
 │   │   ├── nerv_utils.h
-│   │   └── nerv_math.h
+│   │   ├── nerv_math.h
+│   │   └── nerv_log.h
 │   └── Src/
 │       ├── nerv_math.c
-│       └── nerv_utils.c
+│       ├── nerv_utils.c
+│       └── nerv_log.c
 ├── config/
 │   ├── Inc/
 │   │   └── config.h
@@ -90,11 +92,6 @@ NERV/
 │   └── safety/
 │       ├── Inc/
 │       └── Src/
-├── log/
-│   ├── Inc/
-│   │   └── nerv_log.h
-│   └── Src/
-│       └── nerv_log.c
 └── scripts/
     └── check_style.py
 ```
@@ -106,11 +103,11 @@ NERV/
 - `bsp/Inc/` 定义与 MCU 无关的外设接口; `bsp/<platform>/` 是实现, 可以包含 MCU 厂商头文件.
 - `bsp/stm32h7/` 是 STM32 HAL 参考实现. 该目录的源文件与平台门面头可以包含 HAL; `bsp/Inc/` 保持与 MCU 无关.
 - `module/<name>/` 只包含硬件无关逻辑, 不得包含 MCU 厂商头文件或 RTOS 头文件.
-- `log/` 是可选基础设施, 通过回调输出, 不直接包含 UART 或 RTOS 头文件.
+- `public/Inc/nerv_log.h` 与 `public/Src/nerv_log.c` 是可选日志基础设施, 通过回调输出, 不直接包含 UART 或 RTOS 头文件.
 - 仓库不包含 `app/`, `tests/`, `MDK-ARM/`, `Core/`, `Drivers/`, `.ioc`, 启动文件或链接脚本.
 - 应用层由使用者实现. 库不提供 `chassis_task`, `gimbal_task`, `shoot_task` 或 `app_init`.
 - 新增 MCU 时只新增 `bsp/<platform>/` 并在 `config.h` 中选择, 不修改已有 `module/`.
-- 库不提供构建系统. 使用者把自己的工程需要的 `public/`, `config/`, `bsp/`, `module/`, `log/` 源文件加入工程.
+- 库不提供构建系统. 使用者把自己的工程需要的 `public/`, `config/`, `bsp/`, `module/` 源文件加入工程.
 
 include path 顺序:
 
@@ -118,7 +115,6 @@ include path 顺序:
 2. `config/Inc`
 3. `bsp/Inc`
 4. `module/<name>/Inc`
-5. `log/Inc`
 
 `bsp/<platform>/Inc` 只能被该平台适配层自己的源文件包含, 不得进入 `module/` 的 include path. 禁止使用 `#include "../module/xxx/Inc/xxx.h"` 这类相对路径.
 
@@ -131,14 +127,14 @@ include path 顺序:
 ```
 module/       硬件无关功能单元
 bsp/          外设接口与平台适配
-public/       状态码, 类型, 数学与单位工具
+public/       状态码, 类型, 数学, 单位与日志工具
 config/       编译期平台选择与功能裁剪
-log/          可选日志基础设施
 ```
 
 ### 3.1 public
 
-- 只依赖 C 标准库与 `stdint.h`, `stddef.h`, `stdbool.h`.
+- 除日志模块外, 只依赖 C 标准库与 `stdint.h`, `stddef.h`, `stdbool.h`.
+- 日志模块的 `nerv_log.h` 可以包含 `config.h` 与 `nerv_status.h`.
 - 不包含 HAL, 不包含 CMSIS, 不包含 RTOS 头文件.
 - 提供 `NERV_StatusTypeDef`, 错误码, 数学函数, 单位转换与通用宏.
 - 提供确实被多个模块使用的通用类型, 例如 `NERV_AttitudeTypeDef`. 只有单一模块使用的类型放在该模块的头文件中, 带模块前缀.
@@ -169,7 +165,7 @@ log/          可选日志基础设施
 
 ### 3.5 log
 
-- `log/Inc/nerv_log.h` 只依赖 `public/` 与 `config/`.
+- `public/Inc/nerv_log.h` 与 `public/Src/nerv_log.c` 只依赖 `public/` 与 `config/`.
 - 日志通过使用者的输出回调发送, 不直接操作 UART, 不创建任务, 不依赖 RTOS.
 - 日志模块是全局服务, 允许一个静态输出回调; 其他模块不得使用全局单例.
 
@@ -210,51 +206,92 @@ typedef enum
 
 ### 4.2 扩展错误码
 
-扩展错误码采用位掩码语义. 高 8 位为域号, 低 24 位为域内错误位. 使用 `#define` 与固定宽度无符号整型, 不使用 `enum`, 因为调用者需要对错误位做按位或.
+扩展错误码采用位掩码语义. 高 8 位为域号, 低 24 位为域内错误位. 域号使用 one-hot 编码, 多个域号可以按位或. 低 24 位按域分段, 每个子错误在整个低 24 位中占据唯一位置. 使用 `#define` 与固定宽度无符号整型, 不使用 `enum`, 因为调用者需要对错误位做按位或.
+
+| 域 | 域号 | 低 24 位范围 | 域掩码 |
+| --- | --- | --- | --- |
+| 公共 | `NERV_ERR_BIT(0)` | bit 0..5 | `NERV_ERR_COMMON_BITS_MASK` |
+| FDCAN | `NERV_ERR_BIT(1)` | bit 6..8 | `NERV_ERR_FDCAN_BITS_MASK` |
+| 电机 | `NERV_ERR_BIT(2)` | bit 9..10 | `NERV_ERR_MOTOR_BITS_MASK` |
+| 底盘 | `NERV_ERR_BIT(3)` | bit 11..12 | `NERV_ERR_CHASSIS_BITS_MASK` |
+| 云台 | `NERV_ERR_BIT(4)` | bit 13..14 | `NERV_ERR_GIMBAL_BITS_MASK` |
+| 发射 | `NERV_ERR_BIT(5)` | bit 15..16 | `NERV_ERR_SHOOT_BITS_MASK` |
+| 安全 | `NERV_ERR_BIT(6)` | bit 17..18 | `NERV_ERR_SAFETY_BITS_MASK` |
+
+bit 19..23 为预留位. 扩展现有域时优先从预留位分配, 把新位并入对应域的 `NERV_ERR_<DOMAIN>_BITS_MASK`, 不移动已有错误位. 预留位用尽时才重新分配并同步升级遥测协议版本.
+
+错误码直接使用 `NERV_ERR_BIT(全局位号)`, 不引入域内偏移辅助宏. 域号同样直接使用 `NERV_ERR_BIT(域内位号)`, 显式写出置位的是哪一位, 位号即域编号字节 (高 8 位) 中的位置. 域掩码也用 `NERV_ERR_BIT` 显式组合, 使每个错误码的位号可以直接核对.
 
 ```c
 #define NERV_ERR_NONE 0x00000000U
 #define NERV_ERR_ALL  0xFFFFFFFFU
-
-#define NERV_ERR_DOMAIN_COMMON  0x00U
-#define NERV_ERR_DOMAIN_FDCAN   0x01U
-#define NERV_ERR_DOMAIN_MOTOR   0x02U
-#define NERV_ERR_DOMAIN_CHASSIS 0x03U
-#define NERV_ERR_DOMAIN_GIMBAL  0x04U
-#define NERV_ERR_DOMAIN_SHOOT   0x05U
-#define NERV_ERR_DOMAIN_SAFETY  0x06U
+#define NERV_ERR_BITS_MASK 0x00FFFFFFU
 
 #define NERV_ERR_DOMAIN(_domain) ((uint32_t)(_domain) << 24U)
 #define NERV_ERR_BIT(_bit)       ((uint32_t)1U << (_bit))
 
-#define NERV_ERR_COMMON_INVALID_PARAM   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(0U))
-#define NERV_ERR_COMMON_NULL_PTR        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(1U))
-#define NERV_ERR_COMMON_NOT_INITIALIZED (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(2U))
-#define NERV_ERR_COMMON_NO_MEMORY       (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(3U))
-#define NERV_ERR_COMMON_OUT_OF_RANGE    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(4U))
-#define NERV_ERR_COMMON_NOT_SUPPORTED   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(5U))
+/* 域号用 NERV_ERR_BIT 显式写出置位位号, 位号即域编号字节中的位置. */
+#define NERV_ERR_DOMAIN_COMMON  NERV_ERR_BIT(0U)
+#define NERV_ERR_DOMAIN_FDCAN   NERV_ERR_BIT(1U)
+#define NERV_ERR_DOMAIN_MOTOR   NERV_ERR_BIT(2U)
+#define NERV_ERR_DOMAIN_CHASSIS NERV_ERR_BIT(3U)
+#define NERV_ERR_DOMAIN_GIMBAL  NERV_ERR_BIT(4U)
+#define NERV_ERR_DOMAIN_SHOOT   NERV_ERR_BIT(5U)
+#define NERV_ERR_DOMAIN_SAFETY  NERV_ERR_BIT(6U)
 
-#define NERV_ERR_FDCAN_FILTER     (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(0U))
-#define NERV_ERR_FDCAN_TX_MAILBOX (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(1U))
-#define NERV_ERR_FDCAN_RX_OVERRUN (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(2U))
+/* 域掩码用 NERV_ERR_BIT 显式组合, 例如: */
+#define NERV_ERR_FDCAN_BITS_MASK \
+    (NERV_ERR_BIT(6U) | NERV_ERR_BIT(7U) | NERV_ERR_BIT(8U))
 
-#define NERV_ERR_MOTOR_OFFLINE   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(0U))
-#define NERV_ERR_MOTOR_OVER_TEMP (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(1U))
+#define NERV_ERR_COMMON_INVALID_PARAM \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(0U))
+#define NERV_ERR_COMMON_NULL_PTR \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(1U))
+#define NERV_ERR_COMMON_NOT_INITIALIZED \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(2U))
+#define NERV_ERR_COMMON_NO_MEMORY \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(3U))
+#define NERV_ERR_COMMON_OUT_OF_RANGE \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(4U))
+#define NERV_ERR_COMMON_NOT_SUPPORTED \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(5U))
 
-#define NERV_ERR_CHASSIS_KINEMATICS    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(0U))
-#define NERV_ERR_CHASSIS_WHEEL_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(1U))
+#define NERV_ERR_FDCAN_FILTER \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(6U))
+#define NERV_ERR_FDCAN_TX_MAILBOX \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(7U))
+#define NERV_ERR_FDCAN_RX_OVERRUN \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(8U))
 
-#define NERV_ERR_GIMBAL_LIMIT   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(0U))
-#define NERV_ERR_GIMBAL_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(1U))
+#define NERV_ERR_MOTOR_OFFLINE \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(9U))
+#define NERV_ERR_MOTOR_OVER_TEMP \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(10U))
 
-#define NERV_ERR_SHOOT_JAM     (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(0U))
-#define NERV_ERR_SHOOT_OFFLINE (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(1U))
+#define NERV_ERR_CHASSIS_KINEMATICS \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(11U))
+#define NERV_ERR_CHASSIS_WHEEL_OFFLINE \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(12U))
 
-#define NERV_ERR_SAFETY_ESTOP   (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
-#define NERV_ERR_SAFETY_LATCHED (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
+#define NERV_ERR_GIMBAL_LIMIT \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(13U))
+#define NERV_ERR_GIMBAL_OFFLINE \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(14U))
+
+#define NERV_ERR_SHOOT_JAM \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(15U))
+#define NERV_ERR_SHOOT_OFFLINE \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(16U))
+
+#define NERV_ERR_SAFETY_ESTOP \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(17U))
+#define NERV_ERR_SAFETY_LATCHED \
+    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(18U))
 ```
 
-上表只列名称与取值. `public/Inc/nerv_status.h` 中每个宏单独带一段文档块, 写明语义, 使任意宏都能被 `@ref` 引用. 参数的可选值列表按第 8.7 节书写.
+模块实例只保存 `code & NERV_ERR_BITS_MASK`. `GetError` 用各域的 `NERV_ERR_<DOMAIN>_BITS_MASK` 判断哪些域非零, 再用 `NERV_ERR_DOMAIN(domain_mask)` 重建高 8 位. `ClearError` 用 `mask & NERV_ERR_BITS_MASK` 只清除低 24 位, 避免清除共享的域号字节.
+
+代码块只列名称与取值. `public/Inc/nerv_status.h` 中每个宏单独带一段文档块, 写明语义, 使任意宏都能被 `@ref` 引用. 参数的可选值列表按第 8.7 节书写.
 
 ### 4.3 规则
 
@@ -271,9 +308,51 @@ void     NERV_<Module>_ClearError(NERV_<Module>_InstanceTypeDef *self, uint32_t 
 - `ClearError` 不处理 `NERV_ERR_SAFETY_ESTOP`. 该位只由 `NERV_Safety_ClearEStop` 清除, 避免全清操作绕过急停保护.
 - 错误位在中断中置位, 在任务中清除时必须使用临界区或原子位操作.
 - 错误码集中定义在 `public/Inc/nerv_status.h`. 禁止在模块头文件中散落定义.
+- 域号宏 `NERV_ERR_DOMAIN_<DOMAIN>` 必须 one-hot. 低 24 位的子错误位必须在全局范围内唯一, 不允许不同域复用同一低位.
+- 错误码定义直接写出 `NERV_ERR_BIT(全局位号)`, 域号定义直接写出 `NERV_ERR_BIT(域内位号)`, 不引入 `NERV_ERR_<DOMAIN>_BIT_OFFSET` 或 `NERV_ERR_<DOMAIN>_BIT(_bit)` 这类隐藏偏移的辅助宏. 域掩码也使用 `NERV_ERR_BIT` 显式组合.
+- 模块实例的错误寄存器只保存 `code & NERV_ERR_BITS_MASK`. 置位与清除按以下模式实现:
+
+```c
+self->error |= (code & NERV_ERR_BITS_MASK);
+self->error &= ~(mask & NERV_ERR_BITS_MASK);
+```
+
+- `GetError` 根据低 24 位重建高 8 位域号:
+
+```c
+uint32_t NERV_Example_GetError(const NERV_Example_InstanceTypeDef *self)
+{
+    uint32_t bits;
+    uint32_t domain;
+
+    if (NULL == self)
+    {
+        return NERV_ERR_NONE;
+    }
+
+    bits = self->error & NERV_ERR_BITS_MASK;
+    domain = 0U;
+
+    if (0U != (bits & NERV_ERR_COMMON_BITS_MASK))
+    {
+        domain |= NERV_ERR_DOMAIN_COMMON;
+    }
+
+    if (0U != (bits & NERV_ERR_FDCAN_BITS_MASK))
+    {
+        domain |= NERV_ERR_DOMAIN_FDCAN;
+    }
+
+    /* 其他域同理. */
+
+    return NERV_ERR_DOMAIN(domain) | bits;
+}
+```
+
+- 扩展现有域时优先使用 bit 19..23, 把新位并入该域的 `NERV_ERR_<DOMAIN>_BITS_MASK`, 不移动已有错误位. 预留位用尽时才重新分配并同步升级遥测协议版本.
 - 错误码名称统一为 `NERV_ERR_<DOMAIN>_<CONTENT>`, 域名与具体内容之间用下划线连接. 域号宏 `NERV_ERR_DOMAIN_<DOMAIN>` 是例外, 它表示域编号本身, 不是错误码.
 - 全局服务模块, 例如日志模块, 通过返回值报告错误, 不提供实例错误寄存器.
-- `config/Src/config_check.c` 使用 `_Static_assert` 检查域号与位号不冲突.
+- `config/Src/config_check.c` 使用 `_Static_assert` 检查域号 one-hot, 各域低位掩码与错误码位号.
 
 ```c
 _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
@@ -1227,7 +1306,7 @@ _Static_assert(NERV_USE_LOG == 0 || NERV_USE_LOG == 1,
 ### 11.3 接口
 
 ```c
-/* log/Inc/nerv_log.h */
+/* public/Inc/nerv_log.h */
 
 typedef enum
 {
@@ -1241,7 +1320,6 @@ typedef void (*NERV_Log_OutputTypeDef)(const char *msg,
                                        uint16_t len,
                                        void *user);
 
-NERV_StatusTypeDef NERV_Log_Init(NERV_Log_OutputTypeDef output, void *user);
 NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user);
 NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len);
 
@@ -1252,8 +1330,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
                                    ...);
 ```
 
-- `NERV_Log_Init` 保存输出回调与上下文, 不访问硬件.
-- `NERV_Log_SetOutput` 可在运行期替换输出回调, 但不负责同步.
+- `NERV_Log_SetOutput` 保存或替换输出回调与上下文, 不访问硬件, 不负责同步.
 - `NERV_Log_Write` 把已经格式化的字节序列交给输出回调.
 - `NERV_Log_Printf` 是日志模块的格式化入口, 也是唯一的可变参数函数例外.
 - 所有函数在失败时返回 `NERV_ERROR`, 不设置全局错误寄存器.
@@ -1300,7 +1377,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 ### 11.5 实现
 
 ```c
-/* log/Src/nerv_log.c */
+/* public/Src/nerv_log.c */
 
 #include "nerv_log.h"
 
@@ -1320,19 +1397,6 @@ _Static_assert((int)NERV_LOG_LEVEL_DEBUG == (int)NERV_LOG_LEVEL_DEBUG_RT,
 
 static NERV_Log_OutputTypeDef nerv_log_output;
 static void *nerv_log_user;
-
-NERV_StatusTypeDef NERV_Log_Init(NERV_Log_OutputTypeDef output, void *user)
-{
-    if (NULL == output)
-    {
-        return NERV_ERROR;
-    }
-
-    nerv_log_output = output;
-    nerv_log_user = user;
-
-    return NERV_OK;
-}
 
 NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user)
 {
@@ -1411,13 +1475,6 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 
 #else
 
-NERV_StatusTypeDef NERV_Log_Init(NERV_Log_OutputTypeDef output, void *user)
-{
-    (void)output;
-    (void)user;
-    return NERV_OK;
-}
-
 NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user)
 {
     (void)output;
@@ -1454,7 +1511,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 - 日志模块不分配堆内存. `msg` 位于调用者栈上, 大小由 `NERV_LOG_MSG_MAX` 限制.
 - `vsnprintf` 的返回值按标准 C 处理: 负值表示格式错误, 大于等于缓冲区大小表示截断.
 - `NERV_LOG_USE_FLOAT=0` 时, 调用者不得在格式串中使用浮点格式, 否则行为取决于标准库.
-- 日志模块不提供弱符号钩子. 输出函数必须通过 `NERV_Log_Init` 或 `NERV_Log_SetOutput` 显式注册.
+- 日志模块不提供弱符号钩子. 输出函数必须通过 `NERV_Log_SetOutput` 显式注册.
 
 ### 11.6 线程与 ISR 约束
 
@@ -1537,7 +1594,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 
 - 库可以在使用者工程中与任意 RTOS 共存, 但 RTOS 适配代码不属于库核心.
 - 若使用者需要 RTOS 互斥量, 应在自己的封装层中加锁, 不修改模块内部实现.
-- 若使用者需要异步日志, 应在自己的工程中实现缓冲区与输出任务, 不修改 `log/`.
+- 若使用者需要异步日志, 应在自己的工程中实现缓冲区与输出任务, 不修改 `public/Inc/nerv_log.h` 与 `public/Src/nerv_log.c`.
 - 库不提供 FreeRTOS, CMSIS-OS, Zephyr 或 RT-Thread 的绑定.
 
 ---
@@ -2024,8 +2081,8 @@ NERV_StatusTypeDef NERV_<Module>_EnterSafeState(
 安全域使用 `NERV_ERR_DOMAIN_SAFETY`:
 
 ```c
-#define NERV_ERR_SAFETY_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(0U))
-#define NERV_ERR_SAFETY_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(1U))
+#define NERV_ERR_SAFETY_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(17U))
+#define NERV_ERR_SAFETY_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(18U))
 ```
 
 - `NERV_ERR_SAFETY_ESTOP` 表示软件急停已触发并锁存, 等待显式复位.
@@ -2143,11 +2200,11 @@ docs(agents): define library-only repository boundary
 - 仓库没有 `app/`, 应用任务, `chassis_task`, `gimbal_task`, `shoot_task` 或 `app_init`.
 - 仓库没有 `tests/`, HIL 配置, CI 配置或测试报告.
 - 仓库没有构建系统文件. 使用者把自己的工程需要的源文件加入工程.
-- 库只包含 `public/`, `config/`, `bsp/`, `module/`, `log/` 与仓库检查脚本.
+- 库只包含 `public/`, `config/`, `bsp/`, `module/` 与仓库检查脚本.
 
 ### 20.2 可移植性
 
-- `public/`, `module/`, `log/` 没有包含 MCU 厂商头文件.
+- `public/`, `module/` 没有包含 MCU 厂商头文件.
 - `module/` 没有包含 `bsp/<platform>/` 头文件.
 - HAL 调用只出现在 `bsp/<platform>/`; HAL 源文件与 CubeMX 生成文件不在本库.
 - `config/Inc/config.h` 是唯一配置入口, 不包含 HAL 头文件.

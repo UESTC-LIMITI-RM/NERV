@@ -190,10 +190,11 @@ log/Inc/nerv_log.h
 log/Src/nerv_log.c
 ```
 
-- [ ] `config.h`: 按 `AGENTS.md` 第 10.2 节落平台选择, `NERV_PLATFORM_NONE` 表示未选择并触发 `#error`.
-- [ ] `config.h`: 落底盘构型, 电机协议族, 云台轴数, 板间链路的宏定义, 全部支持编译期 `#if` 分支.
-- [ ] `config.h`: 保留 `NERV_USE_LOG`, `NERV_USE_CHASSIS`, `NERV_USE_GIMBAL`, `NERV_USE_SHOOT`, `NERV_USE_SAFETY` 裁剪开关.
-- [ ] `config.h`: 关键宏按第 7.8 节分层保护, 用户可覆盖项用 `#ifndef`, 推导项用 `#if defined(...)` 加 `#error`.
+- [x] `config.h`: 按 `AGENTS.md` 第 10.2 节落平台选择, `NERV_PLATFORM_NONE` 表示未选择并触发 `#error`.
+- [x] `config.h`: 落底盘构型, 电机协议族, 云台轴数, 板间链路的宏定义, 全部支持编译期 `#if` 分支.
+- [x] `config.h`: 保留 `NERV_USE_LOG`, `NERV_USE_CHASSIS`, `NERV_USE_GIMBAL`, `NERV_USE_SHOOT`, `NERV_USE_SAFETY` 裁剪开关.
+- [x] `config.h`: 模块裁剪为 0 时, 不定义该模块的专属配置宏.
+- [x] `config.h`: 关键宏按第 7.8 节分层保护, 用户可覆盖项用 `#ifndef`, 推导项用 `#if defined(...)` 加 `#error`.
 - [ ] `config_check.c`: 用 `_Static_assert` 校验裁剪宏取值, 错误码域号与位号不冲突, 宏与枚举镜像数值一致.
 - [ ] `nerv_log.h`: 级别枚举使用 `_RT` 后缀, 宏使用 `NERV_LOG_LEVEL_*`, 日志宏用 `do { ... } while (0)`.
 - [ ] `nerv_log.c`: 按 `AGENTS.md` 第 11.5 节实现, `NERV_USE_LOG=0` 时保留同签名空实现.

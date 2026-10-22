@@ -173,8 +173,8 @@ public/Src/nerv_unit.c
 - [x] `nerv_status.h`: 定义 `NERV_StatusTypeDef` 与 `AGENTS.md` 第 4.2 节的全部扩展错误码, 错误码只在这里定义.
 - [x] `nerv_types.h`: 定义 `NERV_AttitudeTypeDef`, 供底盘航向与装有 IMU 的模块共用. 只含三个角度, 字段注明轴向与正方向, 使用 SI 单位后缀.
 - [x] `nerv_utils.h`: 提供 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS`. 宏名写明输入与输出单位.
-- [ ] `nerv_math.c`: 实现 `NERV_Math_WrapPi`, `NERV_Math_Wrap2Pi`, `NERV_Math_IsClose` 与限幅, 死区函数. 角度归一化只在这里实现.
-- [ ] `nerv_math.c`: 实现绕 z 轴的二维旋转, 把云台系的底盘速度指令转到机体系. 角速度分量原样传递.
+- [x] `nerv_math.c`: 实现通用区间归一化 `NERV_Math_Wrap`, `NERV_Math_IsClose` 与限幅, 死区函数. 角度归一化使用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
+- [x] `nerv_math.c`: 实现绕 z 轴的二维旋转, 把云台系的底盘速度指令转到机体系. 角速度分量原样传递.
 - [ ] `nerv_unit.c`: 实现 `NERV_Unit_RpmToRadps` 与 `NERV_Unit_RadpsToRpm`.
 - [ ] 头文件自包含, 可被 C 与 C++ 编译器包含.
 - [ ] 每个对外函数写完整 Doxygen, 头文件只保留一行 `@brief`.
@@ -257,7 +257,7 @@ module/chassis/Src/nerv_chassis.c
 - [ ] 实现麦克纳姆, 全向, 舵轮三种解算, 每次编译只保留选中的一种.
 - [ ] 解算函数不使用运行期函数指针分派, 由 `#if` 直接调用.
 - [ ] 麦克纳姆解算按 X 形排列约定, 符号约定写入头文件契约.
-- [ ] 里程计先推进角度再更新位置, 角度用 `NERV_Math_WrapPi` 归一化.
+- [ ] 里程计先推进角度再更新位置, 角度用 `NERV_Math_Wrap` 归一化到 [-π, π).
 - [ ] 错误位覆盖运动学异常与轮离线.
 - [ ] 严重故障置错误位并通知已注册回调, 故障路径不调用日志宏.
 

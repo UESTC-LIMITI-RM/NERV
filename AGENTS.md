@@ -318,9 +318,9 @@ _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
 ### 5.3 角度范围
 
 - 角度统一位于 `[-π, π)`.
-- 跨 ±π 的归一化必须调用 `NERV_Math_WrapPi`.
+- 跨 ±π 的归一化必须调用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
 - 禁止在每个模块中重复实现角度归一化.
-- `NERV_Math_WrapPi` 与 `NERV_Math_Wrap2Pi` 位于 `public/`, 不依赖任何模块.
+- `NERV_Math_Wrap` 位于 `public/`, 不依赖任何模块. 它把数值归一化到调用方指定的半开区间 `[min_value, max_value)`.
 
 ### 5.4 单位转换
 
@@ -343,8 +343,9 @@ float NERV_Unit_RadpsToRpm(float radps);
 | 类别 | 规则 | 示例 |
 | --- | --- | --- |
 | 公开函数 | `NERV_<Module>_<Verb><Noun>` | `NERV_Chassis_Init` |
-| 公共工具函数 | `NERV_Math_`, `NERV_Unit_`, `NERV_Ptr_` | `NERV_Math_WrapPi` |
+| 公共工具函数 | `NERV_Math_`, `NERV_Unit_`, `NERV_Ptr_` | `NERV_Math_Wrap` |
 | 公共工具宏 | `NERV_UTILS_<NAME>`, 仅限 `public/Inc/nerv_utils.h` | `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS` |
+| 公共数学常量 | `NERV_MATH_<NAME>`, 仅限 `public/Inc/nerv_math.h` | `NERV_MATH_PI` |
 | 初始化与注册 | `NERV_<Module>_Register`, 首参数为实例指针 | `NERV_Chassis_Register` |
 | 实例类型 | `NERV_<Module>_InstanceTypeDef` | `NERV_Chassis_InstanceTypeDef` |
 | 配置类型 | `NERV_<Module>_ConfigTypeDef` | `NERV_Chassis_ConfigTypeDef` |
@@ -361,7 +362,7 @@ float NERV_Unit_RadpsToRpm(float radps);
 
 规则:
 
-- 公共工具宏是命名规则的唯一例外, 仅允许定义在 `public/Inc/nerv_utils.h` 中.
+- 公共工具宏与公共数学常量是命名规则的例外. 公共工具宏仅允许定义在 `public/Inc/nerv_utils.h`, 公共数学常量仅允许定义在 `public/Inc/nerv_math.h`.
 - 禁止无前缀的全局符号.
 - 禁止 `err1`, `tmp`, `data` 这类无法表达含义的命名.
 - 禁止单字母变量. 不超过 10 行的循环可以使用 `i`.
@@ -775,16 +776,18 @@ NERV_StatusTypeDef NERV_Chassis_RegisterFaultCallback(
 - 禁止用 `+` 表示并列关系, 使用"与"或逗号.
 - 括号只承载技术符号, 例如函数名, 宏名, 数学表达式, 代码片段. 解释性内容写入主句.
 - 禁止模糊表述, 例如"可能", "大概", "一般情况下".
-- 物理量必须写单位, 例如 `@param rpm: 转速, 单位 rpm`.
+- 物理量必须写单位, 例如 `@param rpm 转速, 单位 rpm`.
 - 前置条件必须可验证, 例如 `@note 必须在 FDCAN 启动之后调用`.
 - 禁止 emoji 与颜文字.
 - 标点使用半角 ASCII.
 
 ### 8.3 Doxygen 位置
 
-- 函数完整契约写在 `.c` 的定义处, 包含 `@brief`, `@param`, `@retval`, `@note`, `@warning`.
-- `.h` 中的函数声明只保留一行 `/** @brief ... */`.
-- 宏, 枚举, 结构体与 `typedef` 的契约写在定义处.
+- 函数完整契约写在 `.c` 的定义处, 包含 `@brief`, `@param`, `@return` 或 `@retval`, `@note`, `@warning`.
+- `@param` 的变量名与描述之间使用空格分隔, 不使用冒号.
+- 一个函数只能有一个 Doxygen 块. 函数在 `.c` 中定义时, 唯一 Doxygen 块写在定义处, `.h` 中的声明不写 Doxygen 注释.
+- 函数在 `.h` 中以 `static inline` 定义时, 唯一 Doxygen 块写在 `.h` 的定义处.
+- `.h` 中的宏, 枚举, 结构体与 `typedef` 没有 `.c` 定义, 其契约写在 `.h` 的定义处.
 - 结构体成员使用 `/**< ... */` 行尾注释.
 - 回调参数必须说明上下文, 生命周期与 ISR 安全性.
 - Doxygen 的 `INPUT` 必须同时包含 `*.h` 与 `*.c`.
@@ -794,10 +797,10 @@ NERV_StatusTypeDef NERV_Chassis_RegisterFaultCallback(
 
 /**
   * @brief  初始化底盘模块.
-  * @param  hchassis: 底盘实例指针, 不得为 NULL.
-  * @param  p_config: 配置指针, 生命周期必须覆盖实例生命周期.
-  * @retval NERV_OK: 初始化成功.
-  * @retval NERV_ERROR: 参数非法或底层初始化失败.
+  * @param  hchassis 底盘实例指针, 不得为 NULL.
+  * @param  p_config 配置指针, 生命周期必须覆盖实例生命周期.
+  * @retval NERV_OK 初始化成功.
+  * @retval NERV_ERROR 参数非法或底层初始化失败.
   * @note   必须在 FDCAN 初始化与启动之后调用.
   * @note   NOT ISR-safe.
   */
@@ -809,20 +812,93 @@ NERV_StatusTypeDef NERV_Chassis_Init(
 对应头文件:
 
 ```c
-/** @brief 初始化底盘模块, 完整契约见 nerv_chassis.c. */
 NERV_StatusTypeDef NERV_Chassis_Init(
     NERV_Chassis_InstanceTypeDef *hchassis,
     const NERV_Chassis_ConfigTypeDef *p_config);
 ```
 
-### 8.4 常用标签
+### 8.4 返回值标签
+
+`@return` 与 `@retval` 都描述返回值. 选择依据是返回值能否逐值枚举, 不是返回类型是否为宏.
+
+#### 8.4.1 @return
+
+`@return` 用于返回值无法逐值枚举的情况:
+
+- 浮点数, 整数, 位掩码等数值结果.
+- 指针, 结构体, 句柄.
+- 返回值的范围, 单位或计算公式需要整体说明.
+
+```c
+/**
+  * @brief  把数值归一化到指定区间.
+  * @param  value 待归一化的数值.
+  * @param  min_value 区间下界, 包含.
+  * @param  max_value 区间上界, 不包含.
+  * @return 与 value 相差整数个区间长度且落在 [min_value, max_value) 的值.
+  * @note   边界非法时返回 value, 不做归一化.
+  * @note   ISR-safe.
+  */
+float NERV_Math_Wrap(float value, float min_value, float max_value);
+```
+
+规则:
+
+- 每个函数只写一条 `@return`.
+- 数值返回值写明单位, 范围与非法输入时的结果.
+- 指针返回值写明指向对象的生命周期与所有权, 失败返回 `NULL` 时写明.
+- 位掩码返回值写明位布局, 不需要逐位写 `@retval`.
+- 不得用 `@return` 罗列多个命名状态. 命名状态使用 `@retval`.
+
+#### 8.4.2 @retval
+
+`@retval` 用于返回值是有限个命名取值之一的情况:
+
+- `NERV_StatusTypeDef` 与其他状态枚举.
+- 普通枚举类型.
+- 展开为离散命名取值的宏.
+
+```c
+/**
+  * @brief  判断两个浮点数是否在容差内相等.
+  * @param  a 第一个值.
+  * @param  b 第二个值.
+  * @param  tolerance 绝对容差, 单位与被比较值相同, 必须为大于等于 0 的有限值.
+  * @param  is_close 比较结果输出, 不得为 NULL. 成功时写入, 失败时不修改.
+  * @retval NERV_OK 比较完成, 结果已写入 is_close.
+  * @retval NERV_ERROR is_close 为 NULL, 或 tolerance 小于 0 或非有限.
+  * @note   ISR-safe.
+  */
+NERV_StatusTypeDef NERV_Math_IsClose(float a, float b, float tolerance, bool *is_close);
+```
+
+规则:
+
+- 函数实际可能返回的每个命名取值各写一条 `@retval`. 不可能返回的值不写.
+- 每条格式为 `@retval <value> <description>`. `<value>` 与描述之间保留一个空格.
+- 不使用冒号分隔取值与描述. 冒号会被 Doxygen 当作普通字符处理, 可能进入取值或描述.
+- `<value>` 写宏名或枚举成员名, 不写表达式, 强制类型转换或数值字面量.
+- 描述写明该返回值对应的条件, 副作用与输出参数状态.
+- 返回状态码并通过输出参数返回结果时, `@retval` 只描述状态码, 结果写在 `@param[out]`.
+- 不得用 `@retval` 描述连续区间, 指针或结构体.
+
+#### 8.4.3 选择规则
+
+| 返回值 | 标签 |
+| --- | --- |
+| 有限个命名取值, 例如 `NERV_StatusTypeDef` 或枚举 | `@retval`, 每个取值一条 |
+| 数值, 范围, 位掩码 | `@return` |
+| 指针, 结构体, 句柄 | `@return` |
+| 状态码与输出参数 | `@retval` 描述状态, `@param[out]` 描述结果 |
+
+Doxygen 生成文档时, `@retval` 条目渲染为返回值表格, `@return` 渲染为一段说明. 同一函数不同时使用两者.
+
+#### 8.4.4 其他常用标签
 
 | 标签 | 用途 |
 | --- | --- |
 | `@brief` | 一句话描述 |
 | `@param[in]`, `@param[out]`, `@param[in,out]` | 参数方向 |
-| `@retval` | 枚举或宏返回值 |
-| `@return` | 指针或数值返回值 |
 | `@note` | 上下文, 合法取值, 线程安全性 |
 | `@warning` | 未定义行为或硬件风险 |
 | `@see` | 关联函数, 类型或宏 |
@@ -885,7 +961,7 @@ Python 脚本模板:
 ```c
 /**
   * @brief  由域号生成错误码的域号段.
-  * @param  _domain: 域号, 可取以下值:
+  * @param  _domain 域号, 可取以下值.
   *                @arg @ref NERV_ERR_DOMAIN_COMMON 公共域.
   *                @arg @ref NERV_ERR_DOMAIN_FDCAN FDCAN 域.
   * @return 域号位于高 8 位, 低 24 位为 0 的掩码.
@@ -1420,6 +1496,8 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 
 默认模型是 `NOT ISR-safe` 与 `caller-synchronized`. 只有明确标注 `ISR-safe` 的函数才能在中断中调用.
 
+标注 `ISR-safe` 时只写 `@note ISR-safe.` 不重复说明不阻塞, 不分配内存等含义.
+
 ### 12.3 调用者责任
 
 使用者的应用层负责:
@@ -1744,6 +1822,7 @@ if ((0U == count) || (count > NERV_MOTOR_MAX_COUNT))
 规则:
 
 - 参数错误返回 `NERV_ERROR`, 不返回未定义值.
+- 计算结果与参数错误需要同时返回时, 函数返回 `NERV_StatusTypeDef`, 计算结果通过输出参数返回.
 - 不得用 `assert` 替代运行时参数检查. `assert` 只用于开发期不变量.
 - 失败路径不得留下部分初始化状态.
 - 失败路径不得泄漏资源.
@@ -1755,7 +1834,7 @@ if ((0U == count) || (count > NERV_MOTOR_MAX_COUNT))
 - 所有减法, 加法, 乘法在可能溢出时必须显式检查.
 - 无符号回绕必须是有意设计, 并在注释中说明.
 - 浮点比较使用容差函数, 禁止直接用 `==`.
-- 角度归一化必须使用 `NERV_Math_WrapPi`.
+- 角度归一化必须使用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
 - 数组索引必须使用 `size_t` 或足以覆盖范围的固定宽度类型.
 - 不得把负数转换为无符号类型后再比较大小.
 - 不得对负数做移位.
@@ -1827,11 +1906,11 @@ typedef void (*NERV_Chassis_FaultCallbackTypeDef)(
 
 /**
   * @brief  注册底盘故障回调.
-  * @param  self: 底盘实例指针, 不得为 NULL.
-  * @param  callback: 回调函数, NULL 表示注销.
-  * @param  user: 回调上下文, 由调用者保证生命周期.
-  * @retval NERV_OK: 注册成功.
-  * @retval NERV_ERROR: 参数非法.
+  * @param  self 底盘实例指针, 不得为 NULL.
+  * @param  callback 回调函数, NULL 表示注销.
+  * @param  user 回调上下文, 由调用者保证生命周期.
+  * @retval NERV_OK 注册成功.
+  * @retval NERV_ERROR 参数非法.
   * @note   回调可能在任务上下文执行, 不得阻塞.
   * @note   NOT ISR-safe.
   */

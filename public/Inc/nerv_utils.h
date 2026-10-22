@@ -1,6 +1,6 @@
 /**
   * @file    nerv_utils.h
-  * @brief   NERV 通用宏工具.
+  * @brief   NERV 通用工具与单位转换.
   * @version 1.0.0
   * @date    2026-10-21
   * @copyright Copyright (c) 2026 NERV Contributors
@@ -12,6 +12,8 @@
 #define NERV_UTILS_H
 
 #include <stdint.h>
+
+#include "nerv_math.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +41,10 @@ extern "C" {
   * @return 无符号整数表示的毫秒超时值.
   */
 #define NERV_UTILS_TIMEOUT_S_TO_MS(_s) ((uint32_t)((_s) * 1000U))
+
+float NERV_Utils_RpmToRadps(float rpm);
+
+float NERV_Utils_RadpsToRpm(float radps);
 
 #ifdef __cplusplus
 }

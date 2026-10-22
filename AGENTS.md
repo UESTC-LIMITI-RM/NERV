@@ -1064,6 +1064,8 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 - 日志缓冲区大小.
 - 协议与安全阈值中允许用户覆盖的默认值.
 
+`NERV_USE_<MODULE>=0` 时, `config.h` 不定义该模块的专属配置宏. 该模块的源文件不参与编译.
+
 `config.h` 不得包含 HAL, CMSIS, RTOS 或任何模块头文件. 不得在模块源文件中出现 `#ifdef STM32H7` 或 `#ifdef BOARD_X` 这类板级判断.
 
 平台门面头文件 `bsp/<platform>/Inc/nerv_<platform>.h` 负责包含厂商 HAL, 只由 BSP 与应用层包含. `module/` 与 `public/` 只包含 `bsp/Inc/` 中的抽象接口.

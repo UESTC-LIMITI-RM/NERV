@@ -64,7 +64,7 @@ typedef enum
 
 /**
   * @brief  由域号生成错误码的域号段.
-  * @param  _domain: 域号, 可取以下值:
+  * @param  _domain 域号, 可取以下值.
   *                @arg @ref NERV_ERR_DOMAIN_COMMON 公共域.
   *                @arg @ref NERV_ERR_DOMAIN_FDCAN FDCAN 域.
   *                @arg @ref NERV_ERR_DOMAIN_MOTOR 电机域.
@@ -78,7 +78,7 @@ typedef enum
 
 /**
   * @brief  由位号生成单比特掩码.
-  * @param  _bit: 位号, 取值 0 到 23.
+  * @param  _bit 位号, 取值 0 到 23.
   * @return 仅 _bit 位为 1 的掩码.
   */
 #define NERV_ERR_BIT(_bit) ((uint32_t)1U << (_bit))

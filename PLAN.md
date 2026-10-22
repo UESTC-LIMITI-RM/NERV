@@ -37,7 +37,7 @@ NERV 面向 RoboMaster 机器人. 主要服务英雄, 哨兵与步兵三类机�
 | --- | --- | --- | --- |
 | M0 | 文档收口 | 无 | `README.md` |
 | M1 | 基础层 | M0 | `public/Inc`, `public/Src` |
-| M2 | 配置与日志 | M1 | `config/`, `log/` |
+| M2 | 配置与日志 | M1 | `config/`, `public/Inc/nerv_log.h`, `public/Src/nerv_log.c` |
 | M3 | BSP 抽象接口 | M1 | `bsp/Inc` |
 | M4 | 电机模块 | M3 | `module/motor/` |
 | M5 | 底盘模块 | M4 | `module/chassis/` |
@@ -179,15 +179,15 @@ public/Src/nerv_utils.c
 - [x] 头文件自包含, 可被 C 与 C++ 编译器包含.
 - [x] 每个对外函数写完整 Doxygen, 头文件声明不写 Doxygen 块.
 
-### M2 `config/` 与 `log/`
+### M2 `config/` 与日志
 
 交付物:
 
 ```
 config/Inc/config.h
 config/Src/config_check.c
-log/Inc/nerv_log.h
-log/Src/nerv_log.c
+public/Inc/nerv_log.h
+public/Src/nerv_log.c
 ```
 
 - [x] `config.h`: 按 `AGENTS.md` 第 10.2 节落平台选择, `NERV_PLATFORM_NONE` 表示未选择并触发 `#error`.
@@ -195,10 +195,11 @@ log/Src/nerv_log.c
 - [x] `config.h`: 保留 `NERV_USE_LOG`, `NERV_USE_CHASSIS`, `NERV_USE_GIMBAL`, `NERV_USE_SHOOT`, `NERV_USE_SAFETY` 裁剪开关.
 - [x] `config.h`: 模块裁剪为 0 时, 不定义该模块的专属配置宏.
 - [x] `config.h`: 关键宏按第 7.8 节分层保护, 用户可覆盖项用 `#ifndef`, 推导项用 `#if defined(...)` 加 `#error`.
-- [ ] `config_check.c`: 用 `_Static_assert` 校验裁剪宏取值, 错误码域号与位号不冲突, 宏与枚举镜像数值一致.
-- [ ] `nerv_log.h`: 级别枚举使用 `_RT` 后缀, 宏使用 `NERV_LOG_LEVEL_*`, 日志宏用 `do { ... } while (0)`.
-- [ ] `nerv_log.c`: 按 `AGENTS.md` 第 11.5 节实现, `NERV_USE_LOG=0` 时保留同签名空实现.
-- [ ] 日志模块不操作 UART, 不创建任务, 不包含 RTOS 头文件.
+- [x] `config_check.c`: 校验平台, 裁剪宏, 底盘, 电机, 云台, 板间链路与日志配置, 错误码域号与位号, 公共结构体大小.
+- [ ] `config_check.c`: 在模块枚举镜像定义后补充宏与枚举镜像数值校验.
+- [x] `nerv_log.h`: 级别枚举使用 `_RT` 后缀, 宏使用 `NERV_LOG_LEVEL_*`, 日志宏用 `do { ... } while (0)`.
+- [x] `nerv_log.c`: 按 `AGENTS.md` 第 11.5 节实现, `NERV_USE_LOG=0` 时保留同签名空实现.
+- [x] 日志模块不操作 UART, 不创建任务, 不包含 RTOS 头文件.
 
 ### M3 `bsp/Inc/` 抽象接口
 
@@ -342,7 +343,7 @@ bsp/stm32h7/Src/nerv_fdcan_stm32h7.c
 语法检查, 在仓库根目录执行:
 
 ```sh
-gcc -std=c11 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsyntax-only -Ipublic/Inc -Iconfig/Inc -Ibsp/Inc -Imodule/motor/Inc -Ilog/Inc public/Src/nerv_math.c
+gcc -std=c11 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsyntax-only -Ipublic/Inc -Iconfig/Inc -Ibsp/Inc -Imodule/motor/Inc public/Src/nerv_math.c
 ```
 
 - [ ] 每新增一个源文件, 至少用它自己的 include path 做一次 `-fsyntax-only`.

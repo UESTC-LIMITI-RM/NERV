@@ -21,9 +21,13 @@ extern "C" {
 
 /**
   * @brief 圆周率, 单位 rad.
-  * @note  用于构造角度区间, 例如 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
   */
 #define NERV_MATH_PI 3.14159265358979323846f
+
+/**
+  * @brief 2π, 单位 rad.
+  */
+#define NERV_MATH_TWO_PI 6.28318530717958647692f
 
 float NERV_Math_Wrap(float value, float min_value, float max_value);
 

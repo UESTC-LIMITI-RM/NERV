@@ -165,19 +165,19 @@ public/Inc/nerv_status.h
 public/Inc/nerv_types.h
 public/Inc/nerv_utils.h
 public/Inc/nerv_math.h
-public/Inc/nerv_unit.h
 public/Src/nerv_math.c
-public/Src/nerv_unit.c
+public/Src/nerv_utils.c
 ```
 
 - [x] `nerv_status.h`: 定义 `NERV_StatusTypeDef` 与 `AGENTS.md` 第 4.2 节的全部扩展错误码, 错误码只在这里定义.
 - [x] `nerv_types.h`: 定义 `NERV_AttitudeTypeDef`, 供底盘航向与装有 IMU 的模块共用. 只含三个角度, 字段注明轴向与正方向, 使用 SI 单位后缀.
-- [x] `nerv_utils.h`: 提供 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS`. 宏名写明输入与输出单位.
+- [x] `nerv_utils.h`: 提供 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS`, 以及 `NERV_Utils_*` 单位转换声明. 宏名写明输入与输出单位.
+- [x] `nerv_math.h`: 定义 `NERV_MATH_PI` 与 `NERV_MATH_TWO_PI`, 供角度与转速换算复用.
 - [x] `nerv_math.c`: 实现通用区间归一化 `NERV_Math_Wrap`, `NERV_Math_IsClose` 与限幅, 死区函数. 角度归一化使用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
 - [x] `nerv_math.c`: 实现绕 z 轴的二维旋转, 把云台系的底盘速度指令转到机体系. 角速度分量原样传递.
-- [ ] `nerv_unit.c`: 实现 `NERV_Unit_RpmToRadps` 与 `NERV_Unit_RadpsToRpm`.
-- [ ] 头文件自包含, 可被 C 与 C++ 编译器包含.
-- [ ] 每个对外函数写完整 Doxygen, 头文件只保留一行 `@brief`.
+- [x] `nerv_utils.c`: 实现 `NERV_Utils_RpmToRadps` 与 `NERV_Utils_RadpsToRpm`.
+- [x] 头文件自包含, 可被 C 与 C++ 编译器包含.
+- [x] 每个对外函数写完整 Doxygen, 头文件声明不写 Doxygen 块.
 
 ### M2 `config/` 与 `log/`
 
@@ -231,7 +231,7 @@ module/motor/Src/nerv_motor.c
 - [ ] `nerv_motor_def.h`: 协议族用宏区分, 至少覆盖 RM 系 CAN 电调, 解析代码按协议族编译期分支.
 - [ ] `nerv_motor.h`: 实例结构体, 配置结构体, 对外函数声明.
 - [ ] 反馈解析显式按字节偏移编码与解码, 不把协议缓冲区直接覆盖成结构体.
-- [ ] 转速换算链路: 原始反馈值, 电机转速, 输出轴转速, 三级量纲分清, 单位换算只调用 `NERV_Unit_*`.
+- [ ] 转速换算链路: 原始反馈值, 电机转速, 输出轴转速, 三级量纲分清, 单位换算只调用 `NERV_Utils_*`.
 - [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`.
 - [ ] 电流指令按可配置上限限幅, 限幅值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中. 过流由电调自身保护兜底, 库不设过流错误位.
 - [ ] 提供 `NERV_Motor_EnterSafeState`, 清零目标值与输出.

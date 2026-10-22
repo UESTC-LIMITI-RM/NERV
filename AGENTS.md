@@ -56,11 +56,10 @@ NERV/
 │   │   ├── nerv_status.h
 │   │   ├── nerv_types.h
 │   │   ├── nerv_utils.h
-│   │   ├── nerv_math.h
-│   │   └── nerv_unit.h
+│   │   └── nerv_math.h
 │   └── Src/
 │       ├── nerv_math.c
-│       └── nerv_unit.c
+│       └── nerv_utils.c
 ├── config/
 │   ├── Inc/
 │   │   └── config.h
@@ -325,13 +324,14 @@ _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
 ### 5.4 单位转换
 
 ```c
-/* public/Inc/nerv_unit.h */
-float NERV_Unit_RpmToRadps(float rpm);
-float NERV_Unit_RadpsToRpm(float radps);
+/* public/Inc/nerv_utils.h */
+float NERV_Utils_RpmToRadps(float rpm);
+float NERV_Utils_RadpsToRpm(float radps);
 ```
 
-- 完整契约写在 `public/Src/nerv_unit.c` 的定义处, 包括参数单位, 返回值单位与调用约束.
-- `NERV_Unit_` 是公共域前缀, 不属于任何具体模块.
+- 完整契约写在 `public/Src/nerv_utils.c` 的定义处, 包括参数单位, 返回值单位与调用约束.
+- 单位转换函数属于 `utils` 模块, 使用 `NERV_Utils_` 前缀.
+- 2π 使用 `NERV_MATH_TWO_PI`, 定义在 `public/Inc/nerv_math.h`, 取值为硬编码的 `6.28318530717958647692f`.
 - 模块不得为了单位转换包含 `nerv_motor.h`.
 
 ---
@@ -343,9 +343,9 @@ float NERV_Unit_RadpsToRpm(float radps);
 | 类别 | 规则 | 示例 |
 | --- | --- | --- |
 | 公开函数 | `NERV_<Module>_<Verb><Noun>` | `NERV_Chassis_Init` |
-| 公共工具函数 | `NERV_Math_`, `NERV_Unit_`, `NERV_Ptr_` | `NERV_Math_Wrap` |
+| 公共工具函数 | `NERV_Math_`, `NERV_Utils_`, `NERV_Ptr_` | `NERV_Math_Wrap`, `NERV_Utils_RpmToRadps` |
 | 公共工具宏 | `NERV_UTILS_<NAME>`, 仅限 `public/Inc/nerv_utils.h` | `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS` |
-| 公共数学常量 | `NERV_MATH_<NAME>`, 仅限 `public/Inc/nerv_math.h` | `NERV_MATH_PI` |
+| 公共数学常量 | `NERV_MATH_<NAME>`, 仅限 `public/Inc/nerv_math.h` | `NERV_MATH_PI`, `NERV_MATH_TWO_PI` |
 | 初始化与注册 | `NERV_<Module>_Register`, 首参数为实例指针 | `NERV_Chassis_Register` |
 | 实例类型 | `NERV_<Module>_InstanceTypeDef` | `NERV_Chassis_InstanceTypeDef` |
 | 配置类型 | `NERV_<Module>_ConfigTypeDef` | `NERV_Chassis_ConfigTypeDef` |
@@ -947,7 +947,7 @@ Python 脚本模板:
 - `@file` 与文件名一致, 不写目录.
 - `@brief` 一句话说明文件职责, 不重复文件内容.
 - `@version` 使用语义化版本. 新建文件为 `1.0.0`, 接口或行为变化时递增.
-- `@date` 使用 `YYYY-MM-DD`, 取最后一次实质修改日期.
+- `@date` 使用 `YYYY-MM-DD`, 取文件首次创建日期. 后续修改不更新该日期.
 - `@copyright` 与仓库根目录 `LICENSE` 一致, 统一为 `Copyright (c) 2026 NERV Contributors`. 不写个人姓名与个人邮箱.
 - 许可证标识用独立一行的 `SPDX-License-Identifier: MIT` 表示, 不写 Doxygen 标签.
 - 禁止使用 `@license`. Doxygen 没有内置的 `\license` 命令, 未知命令按普通文本处理并产生告警.

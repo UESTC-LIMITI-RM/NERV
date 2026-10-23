@@ -110,8 +110,8 @@ typedef void (*NERV_FDCAN_RxCallbackTypeDef)(void *user, const NERV_FDCAN_FrameT
   *         - stop: 停止外设, 停止时未完成的发送由平台处理. NOT ISR-safe.
   *         - configure_filter: 把过滤器数组转换为厂商过滤器配置, 必须在 start
   *                             之前调用. NOT ISR-safe.
-  *         - transmit: 非阻塞发送, 没有空闲发送邮箱时返回 NERV_BUSY. 能否在中断中
-  *                     调用由平台适配层约定.
+  *         - transmit: 非阻塞发送, 不修改实例, self 为 const. 没有空闲发送邮箱时
+  *                     返回 NERV_BUSY. 能否在中断中调用由平台适配层约定.
   *         - get_error: 返回低 24 位粘滞错误位, 读取不清除. 高 8 位域号由
   *                      NERV_FDCAN_GetError 重建.
   *         - clear_error: 清除 mask 中置位的低 24 位错误位. mask 已由通用接口掩码.
@@ -123,7 +123,7 @@ typedef struct
     NERV_StatusTypeDef (*stop)(NERV_FDCAN_InstanceTypeDef *self);
     NERV_StatusTypeDef (*configure_filter)(NERV_FDCAN_InstanceTypeDef *self,
                                            const NERV_FDCAN_FilterTypeDef *filters, uint8_t count);
-    NERV_StatusTypeDef (*transmit)(NERV_FDCAN_InstanceTypeDef *self,
+    NERV_StatusTypeDef (*transmit)(const NERV_FDCAN_InstanceTypeDef *self,
                                    const NERV_FDCAN_FrameTypeDef *frame);
     uint32_t (*get_error)(const NERV_FDCAN_InstanceTypeDef *self);
     void (*clear_error)(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
@@ -247,7 +247,7 @@ static inline NERV_StatusTypeDef NERV_FDCAN_ConfigureFilter(NERV_FDCAN_InstanceT
   * @note   非阻塞. 返回 NERV_OK 只表示帧进入发送流程, 不代表对端已接收.
   * @note   能否在中断中调用由平台适配层约定.
   */
-static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(NERV_FDCAN_InstanceTypeDef *self,
+static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(const NERV_FDCAN_InstanceTypeDef *self,
                                                      const NERV_FDCAN_FrameTypeDef *frame)
 {
     uint32_t id_limit;

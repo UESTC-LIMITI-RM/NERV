@@ -27,14 +27,21 @@ extern "C" {
   * @brief  电机反馈.
   * @note   只承载电机转子量的物理值. 反馈帧原始编码不进入本结构, 输出轴量按
   *         减速比由模块内部另行换算.
+  * @note   temperature_c 在型号无温度字段时为 INT8_MIN, 见 NERV_MOTOR_FB_OFF_NONE.
   */
 typedef struct NERV_Motor_Fb
 {
     float angle_rad;      /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
     float speed_radps;    /**< 转子转速, 单位 rad/s, 逆时针为正. */
     float current_a;      /**< 实际输出转矩, 电调以电流值上报, 单位 A, 正值对应转速正方向. */
-    int8_t temperature_c; /**< 电调温度, 单位 ℃. 来自电调上报, 可用性取决于电调固件与机构. */
+    int8_t temperature_c; /**< 电机温度, 单位 ℃. 由电调上报, 可用性取决于温度传感器与电调固件. */
 } NERV_Motor_FbTypeDef;
+
+/**
+  * @brief  描述符中表示反馈帧无此字段的偏移值.
+  * @note   帧数据长度不超过 64, 0xFF 不会是有效偏移.
+  */
+#define NERV_MOTOR_FB_OFF_NONE 0xFFU
 
 /**
   * @brief  电机型号描述符.
@@ -47,21 +54,21 @@ typedef struct NERV_Motor_Fb
   */
 typedef struct
 {
-    uint32_t tx_id_low;          /**< 控制帧标识符, 设备 id 较小的一组 */
-    uint32_t tx_id_high;         /**< 控制帧标识符, 设备 id 较大的一组 */
-    uint32_t rx_id_base;         /**< 反馈帧标识符基值, 反馈标识符等于本值加设备 id */
-    uint8_t id_min;              /**< 设备 id 最小值 */
-    uint8_t id_max;              /**< 设备 id 最大值 */
-    uint8_t motors_per_frame;    /**< 单条控制帧控制的电机数量 */
-    uint8_t frame_len;           /**< 控制帧与反馈帧数据长度, 单位 byte */
-    uint8_t fb_angle_off;        /**< 反馈帧转子角度字段偏移, uint16 大端 */
-    uint8_t fb_speed_off;        /**< 反馈帧转速字段偏移, int16 大端, 单位 rpm */
-    uint8_t fb_torque_off;       /**< 反馈帧实际输出转矩字段偏移, int16 大端 */
-    uint8_t fb_temperature_off;  /**< 反馈帧温度字段偏移, uint8, 单位 ℃ */
-    uint16_t angle_count;        /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
-    float control_full_scale;    /**< 控制指令满量程, 单位由协议族约定, 编码满量程对应本值 */
-    int16_t control_cmd_limit;   /**< 控制指令编码满量程 */
-    float fb_control_full_scale; /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
+    uint32_t tx_id_low;           /**< 控制帧标识符, 设备 id 较小的一组 */
+    uint32_t tx_id_high;          /**< 控制帧标识符, 设备 id 较大的一组 */
+    uint32_t rx_id_base;          /**< 反馈帧标识符基值, 反馈标识符等于本值加设备 id */
+    uint8_t id_min;               /**< 设备 id 最小值 */
+    uint8_t id_max;               /**< 设备 id 最大值 */
+    uint8_t motors_per_frame;     /**< 单条控制帧控制的电机数量 */
+    uint8_t frame_len;            /**< 控制帧与反馈帧数据长度, 单位 byte */
+    uint8_t fb_angle_off;         /**< 反馈帧转子角度字段偏移, uint16 大端 */
+    uint8_t fb_speed_off;         /**< 反馈帧转速字段偏移, int16 大端, 单位 rpm */
+    uint8_t fb_torque_off;        /**< 反馈帧实际输出转矩字段偏移, int16 大端 */
+    uint8_t fb_temperature_off;   /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
+    uint16_t angle_count;         /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
+    float control_full_scale;     /**< 控制指令满量程, 单位由协议族约定, 编码满量程对应本值 */
+    int16_t control_cmd_limit;    /**< 控制指令编码满量程 */
+    float fb_control_full_scale;  /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
     int16_t fb_control_cmd_limit; /**< 反馈中控制量字段的编码满量程 */
 } NERV_Motor_ModelTypeDef;
 
@@ -89,12 +96,12 @@ typedef struct
   *                       修改帧缓冲. 本函数只按 control_full_scale 限幅到协议满
   *                       量程, 实例级限幅由调用方在调用前完成. ISR-safe.
   *         - decode_fb: 把反馈帧解码为电机反馈, len 必须等于 model 的 frame_len,
-  *                      失败时不修改输出结构. ISR-safe.
+  *                      失败时不修改输出结构. 温度按有符号 int8 透传, 型号无温度
+  *                      字段时置 INT8_MIN. ISR-safe.
   */
 typedef struct
 {
-    NERV_StatusTypeDef (*get_frame_geo)(const NERV_Motor_ModelTypeDef *model,
-                                        uint8_t device_id,
+    NERV_StatusTypeDef (*get_frame_geo)(const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
                                         NERV_Motor_FrameGeoTypeDef *geo);
     NERV_StatusTypeDef (*encode_tx)(const NERV_Motor_ModelTypeDef *model, uint8_t *frame,
                                     uint8_t device_id, float control);
@@ -109,8 +116,8 @@ typedef struct
   */
 typedef struct
 {
-    const NERV_Motor_Driver_OpsTypeDef *ops;  /**< 协议族操作表 */
-    const NERV_Motor_ModelTypeDef *model;     /**< 型号描述符 */
+    const NERV_Motor_Driver_OpsTypeDef *ops; /**< 协议族操作表 */
+    const NERV_Motor_ModelTypeDef *model;    /**< 型号描述符 */
 } NERV_Motor_DriverTypeDef;
 
 #if (NERV_USE_MOTOR_DJI == NERV_ENABLE)
@@ -133,6 +140,9 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji2006;
   * @brief DJI GM6020 电机电流控制模式驱动.
   * @note  由 module/motor/driver/DJI/nerv_motor_driver_dji.c 提供.
   * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
+  * @warning 反馈帧标识符区间 0x205 到 0x20B 与 C620, C610 电调 id 5 到 8 的反馈区间
+  *           0x205 到 0x208 重叠, 同总线混编时会互相误收, 使用时必须错开设备 id
+  *           或避开混编.
   */
 extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current;
 
@@ -142,6 +152,9 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current;
   * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
   * @warning 电压模式控制帧标识符 0x1FF 与 C620 电调高组指令标识符相同, 混编
   *           总线上会冲突, 使用时必须错开设备 id 或避开电压模式.
+  * @warning 反馈帧标识符区间 0x205 到 0x20B 与 C620, C610 电调 id 5 到 8 的反馈区间
+  *           0x205 到 0x208 重叠, 同总线混编时会互相误收, 使用时必须错开设备 id
+  *           或避开混编.
   */
 extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage;
 

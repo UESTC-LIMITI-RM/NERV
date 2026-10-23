@@ -13,7 +13,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 _Static_assert((int)NERV_LOG_LEVEL_ERROR == (int)NERV_LOG_LEVEL_ERROR_RT,
                "NERV_LOG_LEVEL_ERROR and NERV_LOG_LEVEL_ERROR_RT must be equal.");
@@ -42,13 +42,13 @@ static void *nerv_log_user;
   * @note   启动时调用一次即完成初始化. 需要更换输出时再次调用, 后一次覆盖前一次.
   * @note   替换不得与日志输出并发: 输出回调与上下文作为一对读取, 替换瞬间的并发输出
   *         可能读到新回调与旧上下文的组合.
-  * @note   NERV_USE_LOG 为 0 时, 本函数为同签名空实现, 总是返回 NERV_OK.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时, 本函数为同签名空实现, 总是返回 NERV_OK.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized. 同一时刻只能有一个调用者修改输出回调.
   */
 NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user)
 {
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
     if (NULL == output)
     {
         return NERV_ERROR;
@@ -73,13 +73,13 @@ NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user)
   * @retval NERV_ERROR msg 为 NULL, len 为 0, 或输出回调尚未注册.
   * @note   回调在调用者上下文执行, 不得阻塞, 不得递归调用日志接口.
   * @note   msg 只在回调执行期间有效, 回调不得保存该指针.
-  * @note   NERV_USE_LOG 为 0 时, 本函数为同签名空实现, 总是返回 NERV_OK.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时, 本函数为同签名空实现, 总是返回 NERV_OK.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
   */
 NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len)
 {
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
     if ((NULL == msg) || (0U == len))
     {
         return NERV_ERROR;
@@ -111,9 +111,9 @@ NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len)
   * @retval NERV_ERROR file 或 fmt 为 NULL, level 非法, 格式化失败, 或输出失败.
   * @note   格式化缓冲区位于调用者栈上, 大小为 NERV_LOG_MSG_MAX byte.
   * @note   结果超过缓冲区时截断, 保留前 NERV_LOG_MSG_MAX - 1 个 byte.
-  * @note   NERV_LOG_USE_FLOAT 为 0 时, fmt 不得包含浮点格式; 否则行为取决于标准库.
+  * @note   NERV_LOG_USE_FLOAT 为 NERV_DISABLE 时, fmt 不得包含浮点格式; 否则行为取决于标准库.
   * @note   NERV_LOG_USE_FLOAT 只描述工具链能力, 不改变 vsnprintf 的行为.
-  * @note   NERV_USE_LOG 为 0 时, 本函数为同签名空实现, 总是返回 NERV_OK.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时, 本函数为同签名空实现, 总是返回 NERV_OK.
   * @note   不得在 ISR 中调用.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -121,7 +121,7 @@ NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len)
 NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file, uint32_t line,
                                    const char *fmt, ...)
 {
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
     char msg[NERV_LOG_MSG_MAX];
     int written;
     va_list args;

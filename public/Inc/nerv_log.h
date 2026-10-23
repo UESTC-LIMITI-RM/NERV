@@ -24,7 +24,7 @@ extern "C" {
   * @brief  日志级别.
   * @note   成员数值必须与 NERV_LOG_LEVEL_ERROR, NERV_LOG_LEVEL_WARN,
   *         NERV_LOG_LEVEL_INFO 与 NERV_LOG_LEVEL_DEBUG 一致.
-  * @note   只在 NERV_USE_LOG 非 0 时进行数值校验.
+  * @note   只在 NERV_USE_LOG 为 NERV_ENABLE 时进行数值校验.
   */
 typedef enum
 {
@@ -53,7 +53,7 @@ NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len);
 NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file, uint32_t line,
                                    const char *fmt, ...);
 
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 /**
   * @brief  按级别格式化并输出日志.
@@ -78,7 +78,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file
 /**
   * @brief  输出错误级别日志.
   * @param  ... 格式串与可变参数, 至少包含一个格式串实参.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   * @warning 实参中不得包含带副作用的表达式.
   * @note   NOT ISR-safe.
   */
@@ -88,7 +88,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file
 /**
   * @brief  输出警告级别日志.
   * @param  ... 格式串与可变参数, 至少包含一个格式串实参.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   * @warning 实参中不得包含带副作用的表达式.
   * @note   NOT ISR-safe.
   */
@@ -98,7 +98,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file
 /**
   * @brief  输出信息级别日志.
   * @param  ... 格式串与可变参数, 至少包含一个格式串实参.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   * @warning 实参中不得包含带副作用的表达式.
   * @note   NOT ISR-safe.
   */
@@ -108,7 +108,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file
 /**
   * @brief  输出调试级别日志.
   * @param  ... 格式串与可变参数, 至少包含一个格式串实参.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   * @warning 实参中不得包含带副作用的表达式.
   * @note   NOT ISR-safe.
   */
@@ -123,35 +123,35 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file
   * @param  _file 源文件名. 未使用.
   * @param  _line 源码行号. 未使用.
   * @param  ... 格式串与可变参数. 未使用.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   */
 #define NERV_LOG_FORMAT_AND_WRITE(_level, _file, _line, ...) ((void)0)
 
 /**
   * @brief  输出错误级别日志.
   * @param  ... 格式串与可变参数. 未使用.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   */
 #define NERV_LOG_ERROR(...)                                  ((void)0)
 
 /**
   * @brief  输出警告级别日志.
   * @param  ... 格式串与可变参数. 未使用.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   */
 #define NERV_LOG_WARN(...)                                   ((void)0)
 
 /**
   * @brief  输出信息级别日志.
   * @param  ... 格式串与可变参数. 未使用.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   */
 #define NERV_LOG_INFO(...)                                   ((void)0)
 
 /**
   * @brief  输出调试级别日志.
   * @param  ... 格式串与可变参数. 未使用.
-  * @note   NERV_USE_LOG 为 0 时展开为空操作, 实参不求值.
+  * @note   NERV_USE_LOG 为 NERV_DISABLE 时展开为空操作, 实参不求值.
   */
 #define NERV_LOG_DEBUG(...)                                  ((void)0)
 

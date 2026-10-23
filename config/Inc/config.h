@@ -14,7 +14,7 @@
 /*
  * 本文件是 NERV 唯一的编译期配置入口.
  * 使用者只修改本文件的宏选择, 不在模块源文件中添加板级条件编译.
- * 模块裁剪为 0 时, 该模块的专属配置宏不定义.
+ * 模块裁剪为 NERV_DISABLE 时, 该模块的专属配置宏不定义.
  */
 
 /* 平台选择. */
@@ -51,69 +51,146 @@
 #error "NERV_PLATFORM is not supported."
 #endif
 
-/* 模块裁剪开关. 0 表示不编译该模块, 1 表示编译. */
+/* 功能开关取值. 所有表示是否启用的配置项统一取这两个值. */
+
+#if defined(NERV_ENABLE)
+#error "NERV_ENABLE is defined by the library and must not be defined by the user."
+#endif
+
+/**
+  * @brief 启用取值.
+  * @note  带 NERV_ 前缀是必须的. 裸 ENABLE 与裸 DISABLE 会与 STM32 HAL 的
+  *        FunctionalState 枚举成员同名, 在同时包含 config.h 与 HAL 头文件的翻译
+  *        单元中产生宏替换冲突.
+  */
+#define NERV_ENABLE 1U
+
+#if defined(NERV_DISABLE)
+#error "NERV_DISABLE is defined by the library and must not be defined by the user."
+#endif
+
+/**
+  * @brief 禁用取值.
+  */
+#define NERV_DISABLE 0U
+
+/* 模块裁剪开关. 赋 NERV_ENABLE 表示编译该模块, 赋 NERV_DISABLE 表示不编译. */
 
 #ifndef NERV_USE_LOG
 /**
   * @brief 日志模块裁剪开关.
-  * @note  0 表示禁用, 1 表示启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_LOG 1
+#define NERV_USE_LOG NERV_ENABLE
 #endif
 
-#if (NERV_USE_LOG != 0) && (NERV_USE_LOG != 1)
-#error "NERV_USE_LOG must be 0 or 1."
+#if (NERV_USE_LOG != NERV_ENABLE) && (NERV_USE_LOG != NERV_DISABLE)
+#error "NERV_USE_LOG must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #ifndef NERV_USE_CHASSIS
 /**
   * @brief 底盘模块裁剪开关.
-  * @note  0 表示禁用, 1 表示启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_CHASSIS 1
+#define NERV_USE_CHASSIS NERV_ENABLE
 #endif
 
-#if (NERV_USE_CHASSIS != 0) && (NERV_USE_CHASSIS != 1)
-#error "NERV_USE_CHASSIS must be 0 or 1."
+#if (NERV_USE_CHASSIS != NERV_ENABLE) && (NERV_USE_CHASSIS != NERV_DISABLE)
+#error "NERV_USE_CHASSIS must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #ifndef NERV_USE_GIMBAL
 /**
   * @brief 云台模块裁剪开关.
-  * @note  0 表示禁用, 1 表示启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_GIMBAL 1
+#define NERV_USE_GIMBAL NERV_ENABLE
 #endif
 
-#if (NERV_USE_GIMBAL != 0) && (NERV_USE_GIMBAL != 1)
-#error "NERV_USE_GIMBAL must be 0 or 1."
+#if (NERV_USE_GIMBAL != NERV_ENABLE) && (NERV_USE_GIMBAL != NERV_DISABLE)
+#error "NERV_USE_GIMBAL must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #ifndef NERV_USE_SHOOT
 /**
   * @brief 发射模块裁剪开关.
-  * @note  0 表示禁用, 1 表示启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_SHOOT 1
+#define NERV_USE_SHOOT NERV_ENABLE
 #endif
 
-#if (NERV_USE_SHOOT != 0) && (NERV_USE_SHOOT != 1)
-#error "NERV_USE_SHOOT must be 0 or 1."
+#if (NERV_USE_SHOOT != NERV_ENABLE) && (NERV_USE_SHOOT != NERV_DISABLE)
+#error "NERV_USE_SHOOT must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #ifndef NERV_USE_SAFETY
 /**
   * @brief 安全模块裁剪开关.
-  * @note  0 表示禁用, 1 表示启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_SAFETY 1
+#define NERV_USE_SAFETY NERV_ENABLE
 #endif
 
-#if (NERV_USE_SAFETY != 0) && (NERV_USE_SAFETY != 1)
-#error "NERV_USE_SAFETY must be 0 or 1."
+#if (NERV_USE_SAFETY != NERV_ENABLE) && (NERV_USE_SAFETY != NERV_DISABLE)
+#error "NERV_USE_SAFETY must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
-#if (NERV_USE_CHASSIS != 0)
+#ifndef NERV_USE_MOTOR
+/**
+  * @brief 电机模块裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  */
+#define NERV_USE_MOTOR NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR != NERV_ENABLE) && (NERV_USE_MOTOR != NERV_DISABLE)
+#error "NERV_USE_MOTOR must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#if (NERV_USE_MOTOR == NERV_ENABLE)
+
+/* 电机型号裁剪开关. 同一次编译允许启用多个型号, 每个型号的驱动独立编译. */
+
+#ifndef NERV_USE_MOTOR_DJI_3508
+/**
+  * @brief DJI M3508 电机 (C620 电调) 驱动裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  */
+#define NERV_USE_MOTOR_DJI_3508 NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR_DJI_3508 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_3508 != NERV_DISABLE)
+#error "NERV_USE_MOTOR_DJI_3508 must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#ifndef NERV_USE_MOTOR_DJI_2006
+/**
+  * @brief DJI M2006 电机 (C610 电调) 驱动裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  */
+#define NERV_USE_MOTOR_DJI_2006 NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR_DJI_2006 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_2006 != NERV_DISABLE)
+#error "NERV_USE_MOTOR_DJI_2006 must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#ifndef NERV_USE_MOTOR_DJI_6020
+/**
+  * @brief DJI GM6020 电机驱动裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  */
+#define NERV_USE_MOTOR_DJI_6020 NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR_DJI_6020 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_6020 != NERV_DISABLE)
+#error "NERV_USE_MOTOR_DJI_6020 must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#endif /* NERV_USE_MOTOR */
+
+#if (NERV_USE_CHASSIS == NERV_ENABLE)
 
 /* 底盘构型. 同一次编译只能选择一种. */
 
@@ -149,32 +226,7 @@
 
 #endif /* NERV_USE_CHASSIS */
 
-/* 电机协议族. 同一次编译只能选择一种. */
-
-/**
-  * @brief RoboMaster 系列 CAN 电调协议.
-  */
-#define NERV_MOTOR_PROTOCOL_RM_CAN 1U
-
-/**
-  * @brief 自定义电机协议.
-  */
-#define NERV_MOTOR_PROTOCOL_CUSTOM 2U
-
-#ifndef NERV_MOTOR_PROTOCOL
-/**
-  * @brief 当前选择的电机协议族.
-  * @note  必须取 NERV_MOTOR_PROTOCOL_RM_CAN 或 NERV_MOTOR_PROTOCOL_CUSTOM.
-  */
-#define NERV_MOTOR_PROTOCOL NERV_MOTOR_PROTOCOL_RM_CAN
-#endif
-
-#if (NERV_MOTOR_PROTOCOL != NERV_MOTOR_PROTOCOL_RM_CAN) && \
-    (NERV_MOTOR_PROTOCOL != NERV_MOTOR_PROTOCOL_CUSTOM)
-#error "NERV_MOTOR_PROTOCOL is not supported."
-#endif
-
-#if (NERV_USE_GIMBAL != 0)
+#if (NERV_USE_GIMBAL == NERV_ENABLE)
 
 /* 云台轴数. 同一次编译只能选择一种. */
 
@@ -227,7 +279,7 @@
 #error "NERV_BOARD_LINK is not supported."
 #endif
 
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 /* 日志配置. */
 
@@ -279,13 +331,13 @@
 #ifndef NERV_LOG_USE_FLOAT
 /**
   * @brief 日志浮点格式化开关.
-  * @note  0 表示禁用, 1 表示启用. 只在标准库支持浮点格式化时启用.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE. 只在标准库支持浮点格式化时启用.
   */
-#define NERV_LOG_USE_FLOAT 0
+#define NERV_LOG_USE_FLOAT NERV_DISABLE
 #endif
 
-#if (NERV_LOG_USE_FLOAT != 0) && (NERV_LOG_USE_FLOAT != 1)
-#error "NERV_LOG_USE_FLOAT must be 0 or 1."
+#if (NERV_LOG_USE_FLOAT != NERV_ENABLE) && (NERV_LOG_USE_FLOAT != NERV_DISABLE)
+#error "NERV_LOG_USE_FLOAT must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #endif /* NERV_USE_LOG */

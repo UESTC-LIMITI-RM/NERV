@@ -13,8 +13,6 @@
 
 #include <stdint.h>
 
-#include "nerv_math.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -52,7 +52,7 @@ M4 到 M7 之间只通过公开接口与实例交互, 可以并行推进. M8 只
 
 ## 3. 编译期配置机制
 
-RoboMaster 的底盘构型, 电机协议, 云台轴数在同一次编译中只有一个是需要的. 库按编译期选择实现, 使用者通过 `config.h` 决定.
+RoboMaster 的底盘构型, 云台轴数在同一次编译中只有一个是需要的. 电机型号可以在同一次编译中混用, 按型号裁剪编译. 库按编译期选择实现, 使用者通过 `config.h` 决定.
 
 原则:
 
@@ -60,6 +60,7 @@ RoboMaster 的底盘构型, 电机协议, 云台轴数在同一次编译中只�
 - 未选中的实现不参与编译, 不产生目标文件里的代码.
 - 不提供运行期切换构型的接口. 需要运行期切换的工具另说, 不进入固件控制路径.
 - 宏值参与 `#if`, 枚举值参与运行时类型检查, 两者数值必须一致.
+- 是否启用类配置统一取 `NERV_ENABLE` 或 `NERV_DISABLE`, 不写裸 `0` 与 `1`.
 
 三层结构:
 
@@ -137,10 +138,10 @@ static void NERV_Chassis_SolveSteering(NERV_Chassis_InstanceTypeDef *self,
 需要用编译期选择的地方:
 
 - 底盘构型, 麦克纳姆, 全向, 舵轮.
-- 电机协议族, 例如 RM 系 CAN 电调与自定义协议.
 - 云台轴数, 两轴或三轴.
 - 板间通信链路, FDCAN 或 UART.
-- 模块裁剪, `NERV_USE_*`.
+- 模块裁剪, `NERV_USE_*`, 取 `NERV_ENABLE` 或 `NERV_DISABLE`.
+- 电机型号裁剪, `NERV_USE_MOTOR_<VENDOR>_<MODEL>`, 同一次编译可以启用多个.
 - 日志级别, `NERV_LOG_LEVEL`.
 
 ---
@@ -191,14 +192,16 @@ public/Src/nerv_log.c
 ```
 
 - [x] `config.h`: 按 `AGENTS.md` 第 10.2 节落平台选择, `NERV_PLATFORM_NONE` 表示未选择并触发 `#error`.
-- [x] `config.h`: 落底盘构型, 电机协议族, 云台轴数, 板间链路的宏定义, 全部支持编译期 `#if` 分支.
-- [x] `config.h`: 保留 `NERV_USE_LOG`, `NERV_USE_CHASSIS`, `NERV_USE_GIMBAL`, `NERV_USE_SHOOT`, `NERV_USE_SAFETY` 裁剪开关.
-- [x] `config.h`: 模块裁剪为 0 时, 不定义该模块的专属配置宏.
+- [x] `config.h`: 落底盘构型, 云台轴数, 板间链路的宏定义, 全部支持编译期 `#if` 分支; 电机型号改为按型号裁剪, 不再做全局协议单选.
+- [x] `config.h`: 定义 `NERV_ENABLE` 与 `NERV_DISABLE`, 全部是否启用类配置统一取这两个值.
+- [x] `config.h`: 保留 `NERV_USE_LOG`, `NERV_USE_CHASSIS`, `NERV_USE_GIMBAL`, `NERV_USE_SHOOT`, `NERV_USE_SAFETY`, `NERV_USE_MOTOR` 裁剪开关.
+- [x] `config.h`: 增加 `NERV_USE_MOTOR_DJI` 协议族裁剪开关, 可同时启用多个协议族; 同族型号用描述符数据表达, 不按型号条件编译.
+- [x] `config.h`: 模块裁剪为 `NERV_DISABLE` 时, 不定义该模块的专属配置宏.
 - [x] `config.h`: 关键宏按第 7.8 节分层保护, 用户可覆盖项用 `#ifndef`, 推导项用 `#if defined(...)` 加 `#error`.
-- [x] `config_check.c`: 校验平台, 裁剪宏, 底盘, 电机, 云台, 板间链路与日志配置, 错误码域号与位号, 公共结构体大小.
+- [x] `config_check.c`: 校验平台, 开关取值, 裁剪宏, 电机协议族裁剪, 底盘, 云台, 板间链路与日志配置, 错误码域号与位号, 公共结构体大小.
 - [ ] `config_check.c`: 在模块枚举镜像定义后补充宏与枚举镜像数值校验.
 - [x] `nerv_log.h`: 级别枚举使用 `_RT` 后缀, 宏使用 `NERV_LOG_LEVEL_*`, 日志宏用 `do { ... } while (0)`.
-- [x] `nerv_log.c`: 按 `AGENTS.md` 第 11.5 节实现, `NERV_USE_LOG=0` 时保留同签名空实现.
+- [x] `nerv_log.c`: 按 `AGENTS.md` 第 11.5 节实现, `NERV_USE_LOG` 为 `NERV_DISABLE` 时保留同签名空实现.
 - [x] 日志模块不操作 UART, 不创建任务, 不包含 RTOS 头文件.
 
 ### M3 `bsp/Inc/` 抽象接口
@@ -226,20 +229,24 @@ bsp/Inc/nerv_time.h
 
 ```
 module/motor/Inc/nerv_motor.h
-module/motor/Inc/nerv_motor_def.h
 module/motor/Inc/nerv_motor_priv.h
 module/motor/Src/nerv_motor.c
+module/motor/driver/nerv_motor_driver.h
+module/motor/driver/DJI/nerv_motor_driver_dji.c
 ```
 
-- [ ] `nerv_motor_def.h`: 帧 ID 分配, 数据长度, 编码与解码比例, 电流与温度阈值, 减速比.
-- [ ] `nerv_motor_def.h`: 协议族用宏区分, 至少覆盖 RM 系 CAN 电调, 解析代码按协议族编译期分支.
-- [ ] `nerv_motor.h`: 实例结构体, 配置结构体, 对外函数声明.
+- [x] 默认参数全部下沉为实例配置字段: 减速比, 离线阈值, 过温阈值与电流限幅是逐实例的硬件事实或机构策略, 同一次编译混用型号时一个宏无法服务多个实例, 因此不设模块级默认宏, `nerv_motor_def.h` 删除.
+- [x] 驱动分层: driver 接口在 `nerv_motor_driver.h`, 每个协议族一个 `module/motor/driver/<vendor>/nerv_motor_driver_<vendor>.c`; 族内型号差异全部放进 `NERV_Motor_ModelTypeDef` 描述符, 新增型号只增加一个描述符常量与一个 `NERV_Motor_DriverTypeDef` 实例, 不增加函数与宏; 驱动在实例配置中绑定, 同一次编译允许混用多个协议族的多个型号, 主逻辑不含型号分支, 不再做全局编译期单选.
+- [x] 模块公开头文件由 `NERV_USE_MOTOR` 条件编译, 模块关闭时 `nerv_motor_driver.h` 内容为空.
+- [x] 协议族驱动整体由 `NERV_USE_MOTOR` 与 `NERV_USE_MOTOR_<VENDOR>` 条件编译, 协议族关闭时驱动源文件不产生代码, `nerv_motor_driver.h` 中对应的驱动符号也不可见.
+- [x] `driver/DJI/nerv_motor_driver_dji.c`: DJI CAN 电调协议族实现与 M3508 (C620 电调), M2006 (C610 电调), GM6020 (电流与电压两种控制模式各一个驱动实例) 型号描述符, 帧 ID 分组, 显式大端编解码, 驱动层满量程限幅, 温度饱和与参数防御; 控制指令与反馈中控制量字段的编码在描述符中分开表达; 临时数值测试覆盖帧分组, 编解码字节布局与限幅.
+- [ ] `nerv_motor.h`: 实例结构体, 配置结构体, 对外函数声明. 配置字段含 `driver` 驱动绑定, `gear_ratio` 减速比 (必须大于 0), `offline_ms` 离线判定阈值 (0 关闭), `over_temperature_c` 过温阈值 (0 关闭), `current_limit_a` 实例电流限幅 (0 不额外限幅), `invert_direction` 安装方向取反 (指令与反馈统一乘符号, 角度取反后归回 [0, 2π)), 全部逐实例填写, 无库级默认.
 - [ ] 反馈解析显式按字节偏移编码与解码, 不把协议缓冲区直接覆盖成结构体.
 - [ ] 转速换算链路: 原始反馈值, 电机转速, 输出轴转速, 三级量纲分清, 单位换算只调用 `NERV_Utils_*`.
-- [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`.
-- [ ] 电流指令按可配置上限限幅, 限幅值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中. 过流由电调自身保护兜底, 库不设过流错误位.
+- [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`. 过温检查以 `over_temperature_c` 大于 0 为前提, 温度数据不可靠的机构关闭该检查, 由电调自身过温保护兜底.
+- [ ] 电流指令按可配置上限限幅, 上限取实例配置的 `current_limit_a`, 0 表示不额外限幅. 过流由电调自身保护兜底, 库不设过流错误位.
 - [ ] 提供 `NERV_Motor_EnterSafeState`, 清零目标值与输出.
-- [ ] 通信超时判定使用 `NERV_UTILS_TIMEOUT_MS`, 阈值放在 `nerv_motor_def.h` 或 `config.h` 的可覆盖默认宏中.
+- [ ] 通信超时判定使用 `NERV_UTILS_TIMEOUT_MS`, 阈值取实例配置的 `offline_ms`, 0 表示关闭离线判定.
 - [ ] 模块层只通过 `NERV_FDCAN_InstanceTypeDef` 发送, 不接触寄存器.
 
 ### M5 `module/chassis/`
@@ -373,7 +380,7 @@ clang-format --dry-run --Werror public/Inc/nerv_status.h
 
 ## 7. 待确认的问题
 
-- [ ] 电机型号与协议: 目标电机列表, 电调型号, 帧 ID 分配, 反馈字段比例与量程, 减速比. 决定 `nerv_motor_def.h` 的常量.
+- [ ] 电机型号与协议: 目标电机列表, 电调型号, 帧 ID 分配, 反馈字段比例与量程, 各机型减速比. 减速比等硬件参数由使用者在实例配置中逐台填写, 不设库级默认.
 - [ ] 底盘构型: 麦克纳姆, 全向还是舵轮, 轮数, 轮径, 轮距, 电机布局. 决定 `NERV_CHASSIS_TYPE` 与解算实现.
 - [ ] 云台形态: 两轴还是三轴, 限位来源, 是否有双板.
 - [ ] 发射机构形态: 摩擦轮与进弹机构的组合, 卡弹判定依据.

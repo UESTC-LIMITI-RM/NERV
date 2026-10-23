@@ -212,10 +212,10 @@ bsp/Inc/nerv_pwm.h
 bsp/Inc/nerv_time.h
 ```
 
-- [ ] `nerv_fdcan.h`: 按 `AGENTS.md` 第 13.2 节实现帧类型, 过滤器类型, 接收回调, 操作表, 实例结构体.
-- [ ] `nerv_fdcan.h`: 声明 `Init`, `Start`, `Stop`, `ConfigureFilter`, `Transmit`, `RegisterRxCallback`, `GetError`, `ClearError`, `OnRx`.
-- [ ] `nerv_fdcan.h`: 帧结构满足经典帧 8 字节与 FDCAN 帧 64 字节两种长度, 过滤项区分标准帧与扩展帧.
-- [ ] 平台句柄只通过 `priv` 传递, 公开接口不出现 HAL 句柄类型.
+- [x] `nerv_fdcan.h`: 按 `AGENTS.md` 第 13.2 节实现帧类型, 过滤器类型, 接收回调, 操作表, 实例结构体.
+- [x] `nerv_fdcan.h`: 声明 `Init`, `Start`, `Stop`, `ConfigureFilter`, `Transmit`, `RegisterRxCallback`, `GetError`, `ClearError`, `OnRx`.
+- [x] `nerv_fdcan.h`: 帧结构满足经典帧 8 字节与 FDCAN 帧 64 字节两种长度, 过滤项区分标准帧与扩展帧.
+- [x] 平台句柄只通过 `platform_data` 传递, 公开接口不出现 HAL 句柄类型.
 - [ ] `nerv_gpio.h`, `nerv_pwm.h`, `nerv_time.h` 先定类型与操作表, 没有使用方之前不写实现.
 
 ### M4 `module/motor/`
@@ -307,7 +307,7 @@ bsp/stm32h7/Inc/nerv_stm32h7.h
 bsp/stm32h7/Src/nerv_fdcan_stm32h7.c
 ```
 
-- [ ] `nerv_stm32h7.h` 包含 `stm32h7xx_hal.h`, 只由 BSP 与应用层包含, 提供平台初始化入口并把 HAL 句柄绑定到 `priv`.
+- [ ] `nerv_stm32h7.h` 包含 `stm32h7xx_hal.h`, 只由 BSP 与应用层包含, 提供平台初始化入口并把 HAL 句柄绑定到 `platform_data`.
 - [ ] `nerv_fdcan_stm32h7.c` 实现 `NERV_FDCAN_OpsTypeDef` 全部函数.
 - [ ] 接收中断中填充 `NERV_FDCAN_FrameTypeDef` 并调用 `NERV_FDCAN_OnRx`.
 - [ ] 发送无空闲邮箱时返回 `NERV_BUSY`.

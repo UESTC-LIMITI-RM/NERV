@@ -117,12 +117,12 @@ struct NERV_GPIO_Instance
 static inline NERV_StatusTypeDef NERV_GPIO_Init(NERV_GPIO_InstanceTypeDef *self,
                                                 const NERV_GPIO_ConfigTypeDef *config)
 {
-    if (NULL == self || NULL == config)
+    if ((NULL == self) || (NULL == config))
     {
         return NERV_ERROR;
     }
 
-    if (NULL == self->ops || NULL == self->ops->init)
+    if ((NULL == self->ops) || (NULL == self->ops->init))
     {
         return NERV_ERROR;
     }
@@ -172,7 +172,7 @@ static inline NERV_StatusTypeDef NERV_GPIO_DeInit(NERV_GPIO_InstanceTypeDef *sel
         return NERV_ERROR;
     }
 
-    if (NULL == self->ops || NULL == self->ops->deinit)
+    if ((NULL == self->ops) || (NULL == self->ops->deinit))
     {
         return NERV_ERROR;
     }
@@ -197,7 +197,7 @@ static inline NERV_StatusTypeDef NERV_GPIO_Write(NERV_GPIO_InstanceTypeDef *self
         return NERV_ERROR;
     }
 
-    if (NULL == self->ops || NULL == self->ops->write)
+    if ((NULL == self->ops) || (NULL == self->ops->write))
     {
         return NERV_ERROR;
     }
@@ -225,12 +225,12 @@ static inline NERV_StatusTypeDef NERV_GPIO_Write(NERV_GPIO_InstanceTypeDef *self
 static inline NERV_StatusTypeDef NERV_GPIO_Read(const NERV_GPIO_InstanceTypeDef *self,
                                                 NERV_GPIO_LevelTypeDef *level)
 {
-    if (NULL == self || NULL == level)
+    if ((NULL == self) || (NULL == level))
     {
         return NERV_ERROR;
     }
 
-    if (NULL == self->ops || NULL == self->ops->read)
+    if ((NULL == self->ops) || (NULL == self->ops->read))
     {
         return NERV_ERROR;
     }

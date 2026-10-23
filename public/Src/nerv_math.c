@@ -125,11 +125,19 @@ float NERV_Math_Clamp(float value, float min_value, float max_value)
   * @param  threshold 死区阈值, 必须大于等于 0.
   * @return 死区内为 0. 死区外为扣除阈值后的同号数值, 在阈值边界处连续.
   * @note   连续型死区会压缩量程. 需要保留原量程时由调用方自行处理.
+  * @note   threshold 为负时不做死区处理, 原值返回.
   * @note   ISR-safe.
   */
 float NERV_Math_Deadband(float value, float threshold)
 {
-    float magnitude = fabsf(value);
+    float magnitude;
+
+    if (threshold < 0.0f)
+    {
+        return value;
+    }
+
+    magnitude = fabsf(value);
 
     if (magnitude <= threshold)
     {

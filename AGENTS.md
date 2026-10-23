@@ -1077,7 +1077,7 @@ typedef struct NERV_Chassis_Instance
         const struct NERV_Chassis_Instance *self,
         NERV_Chassis_OdometryTypeDef *odom);
 
-    void *priv;  /**< 指向调用者提供的静态私有数据 */
+    void *platform_data;  /**< 指向调用者提供的静态平台数据 */
 } NERV_Chassis_InstanceTypeDef;
 ```
 
@@ -1085,7 +1085,7 @@ typedef struct NERV_Chassis_Instance
 
 - 实例由调用者以静态存储提供.
 - 禁止模块内部依赖全局单例.
-- 禁止在实例中隐藏 `void *` 形式的 HAL 句柄. BSP 句柄放在 `priv` 指向的平台数据结构中.
+- 禁止在实例中隐藏 `void *` 形式的 HAL 句柄. BSP 句柄放在 `platform_data` 指向的平台数据结构中.
 - 库不创建互斥量. 线程安全由调用者通过外部同步保证.
 
 ### 9.2 继承
@@ -1666,7 +1666,7 @@ struct NERV_FDCAN_Instance
     const NERV_FDCAN_OpsTypeDef *ops;       /**< 平台操作表 */
     NERV_FDCAN_RxCallbackTypeDef rx_callback;
     void *rx_user;
-    void *priv;                              /**< 平台私有数据 */
+    void *platform_data;                     /**< 平台私有数据 */
 };
 ```
 
@@ -1725,7 +1725,7 @@ void NERV_FDCAN_OnRx(
 - 实现 `NERV_FDCAN_OpsTypeDef` 中的全部函数.
 - 在接收中断中填充 `NERV_FDCAN_FrameTypeDef`, 调用 `NERV_FDCAN_OnRx`.
 - 在发送完成或错误中断中更新错误位.
-- 提供平台初始化入口, 由使用者把 HAL 句柄或寄存器基址绑定到 `priv`.
+- 提供平台初始化入口, 由使用者把 HAL 句柄或寄存器基址绑定到 `platform_data`.
 
 平台适配层可以包含 MCU 厂商头文件, 但不得包含 `module/` 或应用层头文件.
 

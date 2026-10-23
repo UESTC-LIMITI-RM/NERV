@@ -29,6 +29,7 @@
   * @return 转速, 单位 rad/s. 非有限输入原样返回.
   * @note   1 rpm 等于 2π/60 rad/s.
   * @note   极小输入可能下溢为 0.
+  * @note   极大输入可能上溢为无穷大.
   * @note   ISR-safe.
   */
 float NERV_Utils_RpmToRadps(float rpm)

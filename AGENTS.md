@@ -47,7 +47,7 @@ NERV 不是完整固件, 也不包含任何实际工程文件. 以下内容属�
 
 ## 2. 目录结构
 
-NERV 采用"每个模块一个目录, 目录下再分 `Inc/` 与 `Src/`"的布局. 仓库只包含可复用源码, 配置, 文档与可选的仓库检查脚本.
+NERV 采用"每个模块一个目录, 目录下以 `Inc/` 与 `Src/` 组织, 有协议或设备驱动时增设 `driver/`"的布局. 仓库只包含可复用源码, 配置, 文档与可选的仓库检查脚本.
 
 ```
 NERV/
@@ -79,7 +79,11 @@ NERV/
 ├── module/
 │   ├── motor/
 │   │   ├── Inc/
-│   │   └── Src/
+│   │   ├── Src/
+│   │   └── driver/
+│   │       ├── nerv_motor_driver.h
+│   │       └── DJI/
+│   │           └── nerv_motor_driver_dji.c
 │   ├── chassis/
 │   │   ├── Inc/
 │   │   └── Src/
@@ -103,6 +107,7 @@ NERV/
 - `bsp/Inc/` 定义与 MCU 无关的外设接口; `bsp/<platform>/` 是实现, 可以包含 MCU 厂商头文件.
 - `bsp/stm32h7/` 是 STM32 HAL 参考实现. 该目录的源文件与平台门面头可以包含 HAL; `bsp/Inc/` 保持与 MCU 无关.
 - `module/<name>/` 只包含硬件无关逻辑, 不得包含 MCU 厂商头文件或 RTOS 头文件.
+- `module/<name>/driver/` 放驱动层: 驱动接口头 `nerv_<name>_driver.h` 与每个协议族一个 `driver/<vendor>/nerv_<name>_driver_<vendor>.c`. 协议族内型号差异全部放进型号描述符, 新增型号只增加一个描述符常量与一个驱动实例, 不增加函数与宏; 驱动操作表通过实例配置绑定, 同一次编译允许混用多个协议族的多个型号, 模块主逻辑不包含型号分支.
 - `public/Inc/nerv_log.h` 与 `public/Src/nerv_log.c` 是可选日志基础设施, 通过回调输出, 不直接包含 UART 或 RTOS 头文件.
 - 仓库不包含 `app/`, `tests/`, `MDK-ARM/`, `Core/`, `Drivers/`, `.ioc`, 启动文件或链接脚本.
 - 应用层由使用者实现. 库不提供 `chassis_task`, `gimbal_task`, `shoot_task` 或 `app_init`.
@@ -115,6 +120,7 @@ include path 顺序:
 2. `config/Inc`
 3. `bsp/Inc`
 4. `module/<name>/Inc`
+5. `module/<name>/driver`, 模块设有该子目录时加入, 驱动接口头由此被模块主源文件包含.
 
 `bsp/<platform>/Inc` 只能被该平台适配层自己的源文件包含, 不得进入 `module/` 的 include path. 禁止使用 `#include "../module/xxx/Inc/xxx.h"` 这类相对路径.
 
@@ -1143,7 +1149,9 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 - 日志缓冲区大小.
 - 协议与安全阈值中允许用户覆盖的默认值.
 
-`NERV_USE_<MODULE>=0` 时, `config.h` 不定义该模块的专属配置宏. 该模块的源文件不参与编译.
+所有表示是否启用的配置项统一取 `NERV_ENABLE` 或 `NERV_DISABLE`, 禁止写裸 `0` 与 `1`. 开关值宏必须带 `NERV_` 前缀, 因为 STM32 HAL 的 `FunctionalState` 枚举已使用 `ENABLE` 与 `DISABLE`.
+
+`NERV_USE_<MODULE>` 为 `NERV_DISABLE` 时, `config.h` 不定义该模块的专属配置宏. 该模块的源文件不参与编译. 模块公开头文件中的类型与接口声明同样由该宏条件编译, 关闭时头文件内容为空.
 
 `config.h` 不得包含 HAL, CMSIS, RTOS 或任何模块头文件. 不得在模块源文件中出现 `#ifdef STM32H7` 或 `#ifdef BOARD_X` 这类板级判断.
 
@@ -1173,29 +1181,44 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 #error "NERV_PLATFORM is not supported."
 #endif
 
+#define NERV_ENABLE             1U
+#define NERV_DISABLE            0U
+
 #ifndef NERV_USE_LOG
-#define NERV_USE_LOG            1
+#define NERV_USE_LOG            NERV_ENABLE
 #endif
 
-#if (NERV_USE_LOG != 0) && (NERV_USE_LOG != 1)
-#error "NERV_USE_LOG must be 0 or 1."
+#if (NERV_USE_LOG != NERV_ENABLE) && (NERV_USE_LOG != NERV_DISABLE)
+#error "NERV_USE_LOG must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #ifndef NERV_USE_CHASSIS
-#define NERV_USE_CHASSIS        1
+#define NERV_USE_CHASSIS        NERV_ENABLE
 #endif
 
 #ifndef NERV_USE_GIMBAL
-#define NERV_USE_GIMBAL         1
+#define NERV_USE_GIMBAL         NERV_ENABLE
 #endif
 
 #ifndef NERV_USE_SHOOT
-#define NERV_USE_SHOOT          1
+#define NERV_USE_SHOOT          NERV_ENABLE
 #endif
 
 #ifndef NERV_USE_SAFETY
-#define NERV_USE_SAFETY         1
+#define NERV_USE_SAFETY         NERV_ENABLE
 #endif
+
+#ifndef NERV_USE_MOTOR
+#define NERV_USE_MOTOR          NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR == NERV_ENABLE)
+
+#ifndef NERV_USE_MOTOR_DJI
+#define NERV_USE_MOTOR_DJI      NERV_ENABLE
+#endif
+
+#endif /* NERV_USE_MOTOR */
 
 #endif /* NERV_CONFIG_H */
 ```
@@ -1203,6 +1226,9 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 - `NERV_PLATFORM_NONE` 固定为 `0U`, 只表示未选择平台, 不得作为实际平台使用.
 - 每个实际平台使用唯一编号, 从 `1U` 开始. 名称格式为 `NERV_PLATFORM_<NAME>`.
 - `NERV_PLATFORM` 选择 `bsp/<platform>` 适配层, 在 `config.h` 中只定义一个有效值.
+- `NERV_ENABLE` 与 `NERV_DISABLE` 是全部是否启用类配置项的唯一取值, 固定为 `1U` 与 `0U`. 开关值宏必须带 `NERV_` 前缀, 避免与 STM32 HAL 的 `FunctionalState` 枚举成员冲突.
+- 电机驱动裁剪使用 `NERV_USE_MOTOR_<VENDOR>`. 同一次编译允许启用多个协议族; 协议族关闭时其驱动源文件不产生代码, 驱动符号声明也不可见. 同族型号之间只有常量差异, 用型号描述符表达, 不按型号条件编译.
+- 多选一配置 (平台, 底盘构型, 云台轴数, 板间链路) 使用宏, 不使用枚举, 因为 `#if` 无法引用枚举成员. 运行期枚举镜像按第 7.6 节放在模块头文件中, 成员带 `_RT` 后缀, 数值用 `_Static_assert` 校验.
 - FDCAN 是必需外设. 不提供关闭 FDCAN 的开关.
 - 其他外设按模块需要选择.
 - 不定义任务优先级, 栈大小, 周期, 看门狗超时或应用参数.
@@ -1239,14 +1265,14 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 `config/Src/config_check.c` 使用 `_Static_assert` 检查:
 
 - 平台宏取值合法.
-- 功能裁剪宏为 0 或 1.
+- 功能裁剪宏取 `NERV_ENABLE` 或 `NERV_DISABLE`.
 - 错误码域号与位号不冲突.
 - 枚举镜像与宏数值一致.
 - 关键结构体大小不超过预算.
 
 ```c
-_Static_assert(NERV_USE_LOG == 0 || NERV_USE_LOG == 1,
-               "NERV_USE_LOG must be 0 or 1.");
+_Static_assert((NERV_USE_LOG == NERV_ENABLE) || (NERV_USE_LOG == NERV_DISABLE),
+               "NERV_USE_LOG must be NERV_ENABLE or NERV_DISABLE.");
 ```
 
 ---
@@ -1290,17 +1316,17 @@ _Static_assert(NERV_USE_LOG == 0 || NERV_USE_LOG == 1,
 #endif
 
 #ifndef NERV_LOG_USE_FLOAT
-#define NERV_LOG_USE_FLOAT      0
+#define NERV_LOG_USE_FLOAT      NERV_DISABLE
 #endif
 
-#if (NERV_LOG_USE_FLOAT != 0) && (NERV_LOG_USE_FLOAT != 1)
-#error "NERV_LOG_USE_FLOAT must be 0 or 1."
+#if (NERV_LOG_USE_FLOAT != NERV_ENABLE) && (NERV_LOG_USE_FLOAT != NERV_DISABLE)
+#error "NERV_LOG_USE_FLOAT must be NERV_ENABLE or NERV_DISABLE."
 #endif
 ```
 
-- `NERV_USE_LOG=0` 时所有日志宏展开为空操作, 不产生格式化开销.
-- `NERV_USE_LOG=1` 时日志宏按 `NERV_LOG_LEVEL` 过滤.
-- `NERV_LOG_USE_FLOAT=1` 只在使用者确认标准库支持浮点格式化时启用.
+- `NERV_USE_LOG` 为 `NERV_DISABLE` 时所有日志宏展开为空操作, 不产生格式化开销.
+- `NERV_USE_LOG` 为 `NERV_ENABLE` 时日志宏按 `NERV_LOG_LEVEL` 过滤.
+- `NERV_LOG_USE_FLOAT` 为 `NERV_ENABLE` 时只在使用者确认标准库支持浮点格式化时启用.
 - 不在 `config.h` 中定义 UART 句柄, 任务优先级, 队列长度或输出函数.
 
 ### 11.3 接口
@@ -1338,7 +1364,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 ### 11.4 日志宏
 
 ```c
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 #define NERV_LOG_FORMAT_AND_WRITE(_level, _file, _line, ...) \
     do {                                                       \
@@ -1393,7 +1419,7 @@ _Static_assert((int)NERV_LOG_LEVEL_INFO == (int)NERV_LOG_LEVEL_INFO_RT,
 _Static_assert((int)NERV_LOG_LEVEL_DEBUG == (int)NERV_LOG_LEVEL_DEBUG_RT,
                "NERV_LOG_LEVEL_DEBUG and NERV_LOG_LEVEL_DEBUG_RT must be equal.");
 
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 static NERV_Log_OutputTypeDef nerv_log_output;
 static void *nerv_log_user;
@@ -1510,7 +1536,7 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 - 头文件前缀可以通过 `file` 与 `line` 增加, 但本库不强制格式. 格式化格式由使用者在输出回调或 `NERV_Log_Printf` 的封装层决定.
 - 日志模块不分配堆内存. `msg` 位于调用者栈上, 大小由 `NERV_LOG_MSG_MAX` 限制.
 - `vsnprintf` 的返回值按标准 C 处理: 负值表示格式错误, 大于等于缓冲区大小表示截断.
-- `NERV_LOG_USE_FLOAT=0` 时, 调用者不得在格式串中使用浮点格式, 否则行为取决于标准库.
+- `NERV_LOG_USE_FLOAT` 为 `NERV_DISABLE` 时, 调用者不得在格式串中使用浮点格式, 否则行为取决于标准库.
 - 日志模块不提供弱符号钩子. 输出函数必须通过 `NERV_Log_SetOutput` 显式注册.
 
 ### 11.6 线程与 ISR 约束

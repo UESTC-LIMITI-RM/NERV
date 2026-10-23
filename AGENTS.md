@@ -1877,7 +1877,7 @@ extern "C" {
 ```
 
 - 一个头文件一个 include guard, 命名与文件名一致.
-- 公共头文件只包含标准头文件与本库 `public/`, `config/`, `bsp/Inc/` 头文件.
+- 公共头文件只包含标准头文件, 本库 `public/`, `config/`, `bsp/Inc/` 头文件, 以及同一模块内的头文件.
 - 禁止包含 MCU 厂商头文件, RTOS 头文件, IDE 生成头文件.
 - 禁止在头文件中定义变量或分配存储.
 - 禁止在头文件中使用 `using`, `namespace`, `class`, `template` 等 C++ 关键字作为标识符.

@@ -22,18 +22,45 @@ _Static_assert(NERV_PLATFORM_CUSTOM == 2U, "NERV_PLATFORM_CUSTOM must be 2.");
 _Static_assert((NERV_PLATFORM == NERV_PLATFORM_STM32H7) || (NERV_PLATFORM == NERV_PLATFORM_CUSTOM),
                "NERV_PLATFORM must select a supported platform.");
 
+/* 功能开关取值. */
+
+_Static_assert(NERV_ENABLE == 1U, "NERV_ENABLE must be 1.");
+_Static_assert(NERV_DISABLE == 0U, "NERV_DISABLE must be 0.");
+
 /* 模块裁剪开关. */
 
-_Static_assert((NERV_USE_LOG == 0) || (NERV_USE_LOG == 1), "NERV_USE_LOG must be 0 or 1.");
-_Static_assert((NERV_USE_CHASSIS == 0) || (NERV_USE_CHASSIS == 1),
-               "NERV_USE_CHASSIS must be 0 or 1.");
-_Static_assert((NERV_USE_GIMBAL == 0) || (NERV_USE_GIMBAL == 1), "NERV_USE_GIMBAL must be 0 or 1.");
-_Static_assert((NERV_USE_SHOOT == 0) || (NERV_USE_SHOOT == 1), "NERV_USE_SHOOT must be 0 or 1.");
-_Static_assert((NERV_USE_SAFETY == 0) || (NERV_USE_SAFETY == 1), "NERV_USE_SAFETY must be 0 or 1.");
+_Static_assert((NERV_USE_LOG == NERV_ENABLE) || (NERV_USE_LOG == NERV_DISABLE),
+               "NERV_USE_LOG must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_CHASSIS == NERV_ENABLE) || (NERV_USE_CHASSIS == NERV_DISABLE),
+               "NERV_USE_CHASSIS must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_GIMBAL == NERV_ENABLE) || (NERV_USE_GIMBAL == NERV_DISABLE),
+               "NERV_USE_GIMBAL must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_SHOOT == NERV_ENABLE) || (NERV_USE_SHOOT == NERV_DISABLE),
+               "NERV_USE_SHOOT must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_SAFETY == NERV_ENABLE) || (NERV_USE_SAFETY == NERV_DISABLE),
+               "NERV_USE_SAFETY must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_MOTOR == NERV_ENABLE) || (NERV_USE_MOTOR == NERV_DISABLE),
+               "NERV_USE_MOTOR must be NERV_ENABLE or NERV_DISABLE.");
+
+/* 电机型号裁剪开关. 模块关闭时不检查其专属宏. */
+
+#if (NERV_USE_MOTOR == NERV_ENABLE)
+
+_Static_assert((NERV_USE_MOTOR_DJI_3508 == NERV_ENABLE) ||
+                   (NERV_USE_MOTOR_DJI_3508 == NERV_DISABLE),
+               "NERV_USE_MOTOR_DJI_3508 must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_MOTOR_DJI_2006 == NERV_ENABLE) ||
+                   (NERV_USE_MOTOR_DJI_2006 == NERV_DISABLE),
+               "NERV_USE_MOTOR_DJI_2006 must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_MOTOR_DJI_6020 == NERV_ENABLE) ||
+                   (NERV_USE_MOTOR_DJI_6020 == NERV_DISABLE),
+               "NERV_USE_MOTOR_DJI_6020 must be NERV_ENABLE or NERV_DISABLE.");
+
+#endif /* NERV_USE_MOTOR */
 
 /* 底盘配置. 模块关闭时不检查其专属宏. */
 
-#if (NERV_USE_CHASSIS != 0)
+#if (NERV_USE_CHASSIS == NERV_ENABLE)
 
 _Static_assert(NERV_CHASSIS_TYPE_MECANUM == 1U, "NERV_CHASSIS_TYPE_MECANUM must be 1.");
 _Static_assert(NERV_CHASSIS_TYPE_OMNI == 2U, "NERV_CHASSIS_TYPE_OMNI must be 2.");
@@ -46,18 +73,9 @@ _Static_assert((NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM) ||
 
 #endif /* NERV_USE_CHASSIS */
 
-/* 电机协议族. 电机模块没有独立裁剪开关. */
-
-_Static_assert(NERV_MOTOR_PROTOCOL_RM_CAN == 1U, "NERV_MOTOR_PROTOCOL_RM_CAN must be 1.");
-_Static_assert(NERV_MOTOR_PROTOCOL_CUSTOM == 2U, "NERV_MOTOR_PROTOCOL_CUSTOM must be 2.");
-
-_Static_assert((NERV_MOTOR_PROTOCOL == NERV_MOTOR_PROTOCOL_RM_CAN) ||
-                   (NERV_MOTOR_PROTOCOL == NERV_MOTOR_PROTOCOL_CUSTOM),
-               "NERV_MOTOR_PROTOCOL must select a supported protocol.");
-
 /* 云台配置. 模块关闭时不检查其专属宏. */
 
-#if (NERV_USE_GIMBAL != 0)
+#if (NERV_USE_GIMBAL == NERV_ENABLE)
 
 _Static_assert(NERV_GIMBAL_AXIS_COUNT_2 == 2U, "NERV_GIMBAL_AXIS_COUNT_2 must be 2.");
 _Static_assert(NERV_GIMBAL_AXIS_COUNT_3 == 3U, "NERV_GIMBAL_AXIS_COUNT_3 must be 3.");
@@ -79,7 +97,7 @@ _Static_assert((NERV_BOARD_LINK == NERV_BOARD_LINK_FDCAN) ||
 
 /* 日志配置. 模块关闭时不检查其专属宏. */
 
-#if (NERV_USE_LOG != 0)
+#if (NERV_USE_LOG == NERV_ENABLE)
 
 _Static_assert(NERV_LOG_LEVEL_ERROR == 0U, "NERV_LOG_LEVEL_ERROR must be 0.");
 _Static_assert(NERV_LOG_LEVEL_WARN == 1U, "NERV_LOG_LEVEL_WARN must be 1.");
@@ -90,8 +108,8 @@ _Static_assert((NERV_LOG_LEVEL >= NERV_LOG_LEVEL_ERROR) && (NERV_LOG_LEVEL <= NE
                "NERV_LOG_LEVEL is invalid.");
 _Static_assert((NERV_LOG_MSG_MAX >= 32U) && (NERV_LOG_MSG_MAX <= 512U),
                "NERV_LOG_MSG_MAX must be in range 32 to 512.");
-_Static_assert((NERV_LOG_USE_FLOAT == 0) || (NERV_LOG_USE_FLOAT == 1),
-               "NERV_LOG_USE_FLOAT must be 0 or 1.");
+_Static_assert((NERV_LOG_USE_FLOAT == NERV_ENABLE) || (NERV_LOG_USE_FLOAT == NERV_DISABLE),
+               "NERV_LOG_USE_FLOAT must be NERV_ENABLE or NERV_DISABLE.");
 
 #endif /* NERV_USE_LOG */
 

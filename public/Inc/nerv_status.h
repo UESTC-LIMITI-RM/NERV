@@ -58,7 +58,7 @@ typedef enum
   */
 #define NERV_ERR_BIT(_bit) ((uint32_t)1U << (_bit))
 
-/* 域号 one-hot, 多个域可按位或. 
+/* 域号 one-hot, 多个域可按位或.
  * 位号即域编号字节 (高 8 位) 中的位置, 与低 24 位的错误位号相互独立. */
 
 /** @brief 公共域. */

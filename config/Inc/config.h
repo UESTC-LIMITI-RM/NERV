@@ -150,42 +150,19 @@
 
 #if (NERV_USE_MOTOR == NERV_ENABLE)
 
-/* 电机型号裁剪开关. 同一次编译允许启用多个型号, 每个型号的驱动独立编译. */
+/* 电机协议族裁剪开关. 同一次编译允许启用多个协议族, 每个协议族的驱动独立编译. */
 
-#ifndef NERV_USE_MOTOR_DJI_3508
+#ifndef NERV_USE_MOTOR_DJI
 /**
-  * @brief DJI M3508 电机 (C620 电调) 驱动裁剪开关.
+  * @brief DJI CAN 电调协议族裁剪开关.
   * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  * @note  关闭时 DJI 协议族的驱动源文件与型号符号不参与编译.
   */
-#define NERV_USE_MOTOR_DJI_3508 NERV_ENABLE
+#define NERV_USE_MOTOR_DJI NERV_ENABLE
 #endif
 
-#if (NERV_USE_MOTOR_DJI_3508 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_3508 != NERV_DISABLE)
-#error "NERV_USE_MOTOR_DJI_3508 must be NERV_ENABLE or NERV_DISABLE."
-#endif
-
-#ifndef NERV_USE_MOTOR_DJI_2006
-/**
-  * @brief DJI M2006 电机 (C610 电调) 驱动裁剪开关.
-  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
-  */
-#define NERV_USE_MOTOR_DJI_2006 NERV_ENABLE
-#endif
-
-#if (NERV_USE_MOTOR_DJI_2006 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_2006 != NERV_DISABLE)
-#error "NERV_USE_MOTOR_DJI_2006 must be NERV_ENABLE or NERV_DISABLE."
-#endif
-
-#ifndef NERV_USE_MOTOR_DJI_6020
-/**
-  * @brief DJI GM6020 电机驱动裁剪开关.
-  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
-  */
-#define NERV_USE_MOTOR_DJI_6020 NERV_ENABLE
-#endif
-
-#if (NERV_USE_MOTOR_DJI_6020 != NERV_ENABLE) && (NERV_USE_MOTOR_DJI_6020 != NERV_DISABLE)
-#error "NERV_USE_MOTOR_DJI_6020 must be NERV_ENABLE or NERV_DISABLE."
+#if (NERV_USE_MOTOR_DJI != NERV_ENABLE) && (NERV_USE_MOTOR_DJI != NERV_DISABLE)
+#error "NERV_USE_MOTOR_DJI must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #endif /* NERV_USE_MOTOR */

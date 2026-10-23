@@ -42,19 +42,13 @@ _Static_assert((NERV_USE_SAFETY == NERV_ENABLE) || (NERV_USE_SAFETY == NERV_DISA
 _Static_assert((NERV_USE_MOTOR == NERV_ENABLE) || (NERV_USE_MOTOR == NERV_DISABLE),
                "NERV_USE_MOTOR must be NERV_ENABLE or NERV_DISABLE.");
 
-/* 电机型号裁剪开关. 模块关闭时不检查其专属宏. */
+/* 电机协议族裁剪开关. 模块关闭时不检查其专属宏. */
 
 #if (NERV_USE_MOTOR == NERV_ENABLE)
 
-_Static_assert((NERV_USE_MOTOR_DJI_3508 == NERV_ENABLE) ||
-                   (NERV_USE_MOTOR_DJI_3508 == NERV_DISABLE),
-               "NERV_USE_MOTOR_DJI_3508 must be NERV_ENABLE or NERV_DISABLE.");
-_Static_assert((NERV_USE_MOTOR_DJI_2006 == NERV_ENABLE) ||
-                   (NERV_USE_MOTOR_DJI_2006 == NERV_DISABLE),
-               "NERV_USE_MOTOR_DJI_2006 must be NERV_ENABLE or NERV_DISABLE.");
-_Static_assert((NERV_USE_MOTOR_DJI_6020 == NERV_ENABLE) ||
-                   (NERV_USE_MOTOR_DJI_6020 == NERV_DISABLE),
-               "NERV_USE_MOTOR_DJI_6020 must be NERV_ENABLE or NERV_DISABLE.");
+_Static_assert((NERV_USE_MOTOR_DJI == NERV_ENABLE) ||
+               (NERV_USE_MOTOR_DJI == NERV_DISABLE),
+               "NERV_USE_MOTOR_DJI must be NERV_ENABLE or NERV_DISABLE.");
 
 #endif /* NERV_USE_MOTOR */
 

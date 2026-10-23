@@ -216,7 +216,9 @@ bsp/Inc/nerv_time.h
 - [x] `nerv_fdcan.h`: 声明 `Init`, `Start`, `Stop`, `ConfigureFilter`, `Transmit`, `RegisterRxCallback`, `GetError`, `ClearError`, `OnRx`.
 - [x] `nerv_fdcan.h`: 帧结构满足经典帧 8 字节与 FDCAN 帧 64 字节两种长度, 过滤项区分标准帧与扩展帧.
 - [x] 平台句柄只通过 `platform_data` 传递, 公开接口不出现 HAL 句柄类型.
-- [ ] `nerv_gpio.h`, `nerv_pwm.h`, `nerv_time.h` 先定类型与操作表, 没有使用方之前不写实现.
+- [x] `nerv_gpio.h`: 定方向, 上下拉, 电平枚举, 配置结构体, 操作表与 `Init`, `DeInit`, `Write`, `Read` 通用接口, 未含边沿中断.
+- [ ] `nerv_pwm.h`: 先定类型与操作表, 没有使用方之前不写实现.
+- [ ] `nerv_time.h`: 先定类型与操作表, 没有使用方之前不写实现.
 
 ### M4 `module/motor/`
 

@@ -218,7 +218,7 @@ bsp/Inc/nerv_time.h
 - [x] 平台句柄只通过 `platform_data` 传递, 公开接口不出现 HAL 句柄类型.
 - [x] `nerv_gpio.h`: 定方向, 上下拉, 电平枚举, 配置结构体, 操作表与 `Init`, `DeInit`, `Write`, `Read` 通用接口, 未含边沿中断.
 - [x] `nerv_pwm.h`: 定操作表与 `Init`, `DeInit`, `SetDuty` 通用接口, 占空比取值 0.0 到 1.0, 载波属性归平台配置.
-- [ ] `nerv_time.h`: 先定类型与操作表, 没有使用方之前不写实现.
+- [x] `nerv_time.h`: 定操作表与 `Init`, `GetTickMs` 通用接口, 毫秒计数按无符号回绕, 间隔计算用无符号减法.
 
 ### M4 `module/motor/`
 

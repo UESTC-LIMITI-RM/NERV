@@ -28,14 +28,16 @@ extern "C" {
 
 /**
   * @brief  毫秒超时值.
-  * @param  _ms 超时时长, 单位 ms. 不足 1 ms 的部分截断.
+  * @param  _ms 超时时长, 单位 ms. 必须为无符号整型表达式, 传入浮点会静默截断,
+  *             传入负数会得到巨大值.
   * @return 无符号整数表示的毫秒超时值.
   */
 #define NERV_UTILS_TIMEOUT_MS(_ms) ((uint32_t)(_ms))
 
 /**
   * @brief  秒超时值转换为毫秒.
-  * @param  _s 超时时长, 单位 s. 不足 1 ms 的部分截断.
+  * @param  _s 超时时长, 单位 s. 必须为无符号整型表达式, 传入浮点会静默截断,
+  *             传入负数会得到巨大值.
   * @return 无符号整数表示的毫秒超时值.
   */
 #define NERV_UTILS_TIMEOUT_S_TO_MS(_s) ((uint32_t)((_s) * 1000U))

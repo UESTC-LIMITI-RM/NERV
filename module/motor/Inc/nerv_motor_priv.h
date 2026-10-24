@@ -42,13 +42,23 @@ extern "C" {
 
 /* 内部辅助函数, 只供模块源文件使用, 不进入公开接口. */
 
+static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
+
+static float NERV_Motor_DirectionSign(const NERV_Motor_ConfigTypeDef *config);
+
 static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
                                                const NERV_Motor_FbTypeDef *fb,
-                                               NERV_Motor_StateTypeDef *state);
+                                               NERV_Motor_MeasurementTypeDef *measurement);
+
+static float NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self);
+
+static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
+                                                uint8_t *frame);
 
 static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
 
-static NERV_StatusTypeDef NERV_Motor_TransmitTarget(NERV_Motor_InstanceTypeDef *self);
+static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeDef *const *members,
+                                                        uint8_t count, uint8_t first);
 
 #ifdef __cplusplus
 }

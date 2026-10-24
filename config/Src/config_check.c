@@ -55,6 +55,10 @@ _Static_assert((NERV_USE_MOTOR_DJI == NERV_ENABLE) || (NERV_USE_MOTOR_DJI == NER
 
 #if (NERV_USE_CHASSIS == NERV_ENABLE)
 
+_Static_assert((NERV_USE_CHASSIS_ODOMETRY == NERV_ENABLE) ||
+                   (NERV_USE_CHASSIS_ODOMETRY == NERV_DISABLE),
+               "NERV_USE_CHASSIS_ODOMETRY must be NERV_ENABLE or NERV_DISABLE.");
+
 _Static_assert(NERV_CHASSIS_TYPE_MECANUM == 1U, "NERV_CHASSIS_TYPE_MECANUM must be 1.");
 _Static_assert(NERV_CHASSIS_TYPE_OMNI == 2U, "NERV_CHASSIS_TYPE_OMNI must be 2.");
 _Static_assert(NERV_CHASSIS_TYPE_STEERING == 3U, "NERV_CHASSIS_TYPE_STEERING must be 3.");
@@ -140,10 +144,10 @@ _Static_assert(NERV_ERR_COMMON_BITS_MASK == 0x0000003FU,
                "NERV_ERR_COMMON_BITS_MASK must cover bits 0 to 5.");
 _Static_assert(NERV_ERR_FDCAN_BITS_MASK == 0x000001C0U,
                "NERV_ERR_FDCAN_BITS_MASK must cover bits 6 to 8.");
-_Static_assert(NERV_ERR_MOTOR_BITS_MASK == 0x00000600U,
-               "NERV_ERR_MOTOR_BITS_MASK must cover bits 9 to 10.");
-_Static_assert(NERV_ERR_CHASSIS_BITS_MASK == 0x00001800U,
-               "NERV_ERR_CHASSIS_BITS_MASK must cover bits 11 to 12.");
+_Static_assert(NERV_ERR_MOTOR_BITS_MASK == 0x00100600U,
+               "NERV_ERR_MOTOR_BITS_MASK must cover bits 9, 10 and 20.");
+_Static_assert(NERV_ERR_CHASSIS_BITS_MASK == 0x00081800U,
+               "NERV_ERR_CHASSIS_BITS_MASK must cover bits 11, 12 and 19.");
 _Static_assert(NERV_ERR_GIMBAL_BITS_MASK == 0x00006000U,
                "NERV_ERR_GIMBAL_BITS_MASK must cover bits 13 to 14.");
 _Static_assert(NERV_ERR_SHOOT_BITS_MASK == 0x00018000U,
@@ -158,8 +162,8 @@ _Static_assert(NERV_ERR_SAFETY_BITS_MASK == 0x00060000U,
      NERV_ERR_CHASSIS_BITS_MASK | NERV_ERR_GIMBAL_BITS_MASK | NERV_ERR_SHOOT_BITS_MASK | \
      NERV_ERR_SAFETY_BITS_MASK)
 
-_Static_assert(__NERV_CONFIG_CHECK_ERROR_BITS_MASK == 0x0007FFFFU,
-               "Domain error bits must cover bits 0 to 18 and leave bits 19 to 23 spare.");
+_Static_assert(__NERV_CONFIG_CHECK_ERROR_BITS_MASK == 0x001FFFFFU,
+               "Domain error bits must cover bits 0 to 20 and leave bits 21 to 23 spare.");
 
 /* 错误码的域号, 位号与位范围必须与定义一致. 位号是低 24 位中的全局位号. */
 

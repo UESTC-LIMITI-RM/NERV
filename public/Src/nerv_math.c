@@ -102,6 +102,8 @@ NERV_StatusTypeDef NERV_Math_IsClose(float a, float b, float tolerance, bool *is
   * @param  max_value 区间上界.
   * @return 落在区间内的值, 否则为越界方向的边界值.
   * @note   调用方必须保证 min_value 小于等于 max_value. 两者颠倒时返回 min_value.
+  * @note   value 为 NaN 时原样返回 NaN (NaN 与边界比较均为假), 调用方必须先行
+  *         检查非有限值. value 为无穷时按越界处理返回对应边界值.
   * @note   ISR-safe.
   */
 float NERV_Math_Clamp(float value, float min_value, float max_value)
@@ -182,6 +184,110 @@ NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad)
 
     *vx = new_vx;
     *vy = new_vy;
+
+    return NERV_OK;
+}
+
+/** @cond INTERNAL */
+
+/** @brief 三阶线性方程组求解的相对奇异判据阈值. */
+#define __NERV_MATH_LINEAR3_SINGULAR_EPS 1e-6f
+
+/**
+  * @brief  计算三阶矩阵的行和绝对值的最大值, 作为矩阵量级.
+  * @param  matrix 九个元素, 不得为 NULL.
+  * @return 矩阵无穷范数, 用于相对奇异判据的量纲基准.
+  */
+static float NERV_Math_MatrixNorm3(const float *matrix)
+{
+    float norm;
+    float row_sum;
+    uint8_t row;
+
+    norm = 0.0f;
+
+    for (row = 0U; row < 3U; row++)
+    {
+        row_sum =
+            fabsf(matrix[row * 3U]) + fabsf(matrix[row * 3U + 1U]) + fabsf(matrix[row * 3U + 2U]);
+
+        if (row_sum > norm)
+        {
+            norm = row_sum;
+        }
+    }
+
+    return norm;
+}
+
+/**
+  * @brief  计算三阶矩阵的行列式, 矩阵按行优先连续存储.
+  * @param  matrix 九个元素, 不得为 NULL.
+  * @return 行列式值.
+  */
+static float NERV_Math_Det3(const float *matrix)
+{
+    return matrix[0] * (matrix[4] * matrix[8] - matrix[5] * matrix[7]) -
+           matrix[1] * (matrix[3] * matrix[8] - matrix[5] * matrix[6]) +
+           matrix[2] * (matrix[3] * matrix[7] - matrix[4] * matrix[6]);
+}
+
+/** @endcond */
+
+/**
+  * @brief  解三阶线性方程组.
+  * @param  matrix 三阶系数矩阵, 行优先连续存储, 九个元素, 不得为 NULL.
+  * @param  rhs 右侧向量, 三个元素, 不得为 NULL.
+  * @param  solution 输出解向量, 三个元素, 不得为 NULL. 失败时不修改.
+  * @retval NERV_OK 解已写入 solution.
+  * @retval NERV_ERROR 参数为 NULL, 矩阵奇异或近奇异, 或行列式为非有限值.
+  * @note   用 Cramer 法则求解, 每个解为替换对应列后的行列式除以系数行列式.
+  * @note   奇异判据是相对的: 行列式绝对值不超过矩阵无穷范数立方的 1e-6 时按奇异
+  *         处理. 这样矩阵退化 (如各列共线) 与接近退化 (条件数极大, 解会放大到
+  *         不可用的量级) 都会返回错误, 而不是输出巨大但有限的解.
+  * @note   ISR-safe.
+  */
+NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs, float *solution)
+{
+    float work[9];
+    float determinant;
+    float matrix_norm;
+    uint8_t column;
+    uint8_t row;
+
+    if ((NULL == matrix) || (NULL == rhs) || (NULL == solution))
+    {
+        return NERV_ERROR;
+    }
+
+    determinant = NERV_Math_Det3(matrix);
+
+    if (!isfinite(determinant))
+    {
+        return NERV_ERROR;
+    }
+
+    matrix_norm = NERV_Math_MatrixNorm3(matrix);
+
+    if (fabsf(determinant) <=
+        (__NERV_MATH_LINEAR3_SINGULAR_EPS * matrix_norm * matrix_norm * matrix_norm))
+    {
+        return NERV_ERROR;
+    }
+
+    for (column = 0U; column < 3U; column++)
+    {
+        for (row = 0U; row < 9U; row++)
+        {
+            work[row] = matrix[row];
+        }
+
+        work[column]      = rhs[0];
+        work[3U + column] = rhs[1];
+        work[6U + column] = rhs[2];
+
+        solution[column] = NERV_Math_Det3(work) / determinant;
+    }
 
     return NERV_OK;
 }

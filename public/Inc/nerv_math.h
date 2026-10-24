@@ -39,6 +39,8 @@ float NERV_Math_Deadband(float value, float threshold);
 
 NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad);
 
+NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs, float *solution);
+
 #ifdef __cplusplus
 }
 #endif

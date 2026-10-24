@@ -127,13 +127,13 @@ typedef enum
 
 /**
   * @brief  电机域低 24 位掩码.
-  * @note   覆盖 bit 9 到 bit 10.
+  * @note   覆盖 bit 9, bit 10 与 bit 20.
   */
-#define NERV_ERR_MOTOR_BITS_MASK (NERV_ERR_BIT(9U) | NERV_ERR_BIT(10U))
+#define NERV_ERR_MOTOR_BITS_MASK (NERV_ERR_BIT(9U) | NERV_ERR_BIT(10U) | NERV_ERR_BIT(20U))
 
 /**
   * @brief  底盘域低 24 位掩码.
-  * @note   覆盖 bit 11 到 bit 12.
+  * @note   覆盖 bit 11 与 bit 12.
   */
 #define NERV_ERR_CHASSIS_BITS_MASK (NERV_ERR_BIT(11U) | NERV_ERR_BIT(12U))
 
@@ -187,6 +187,9 @@ typedef enum
 
 /** @brief 电机过温. */
 #define NERV_ERR_MOTOR_OVER_TEMP (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(10U))
+
+/** @brief 电机指令发送失败. */
+#define NERV_ERR_MOTOR_TX_FAIL (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(20U))
 
 /** @brief 运动学异常. */
 #define NERV_ERR_CHASSIS_KINEMATICS (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(11U))

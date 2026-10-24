@@ -354,3 +354,114 @@ NERV_StatusTypeDef NERV_PID_UpdateCascade(NERV_PID_InstanceTypeDef *outer,
 
     return NERV_OK;
 }
+
+/**
+  * @brief  运行时修改单个 PID 参数.
+  * @param  self PID 实例指针, 不得为 NULL 且已初始化.
+  * @param  param 参数标识, 见 NERV_PID_ParamTypeDef.
+  * @param  value 新值, 单位与 NERV_PID_ConfigTypeDef 对应字段相同.
+  * @retval NERV_OK 参数已更新.
+  * @retval NERV_ERROR self 为 NULL, 实例未初始化, 参数非法, 或新值不满足对应的合法性约束.
+  * @note   直接改写实例内复制的配置副本, 不重置积分与微分历史, 适合在线调参.
+  * @note   沿用 NERV_PID_Init 的约束: 增益与阈值非负且有限; 输出与积分限幅有限,
+  *         下限小于上限, 输出限幅区间须包含 0. 校验失败时不修改任何字段.
+  * @note   NOT ISR-safe. 写实例配置, 与 NERV_PID_Update 同属控制链, 不得并发.
+  */
+NERV_StatusTypeDef NERV_PID_SetParam(NERV_PID_InstanceTypeDef *self, NERV_PID_ParamTypeDef param,
+                                     float value)
+{
+    if (NULL == self)
+    {
+        return NERV_ERROR;
+    }
+
+    if (!self->initialized)
+    {
+        return NERV_ERROR;
+    }
+
+    if (!isfinite(value))
+    {
+        return NERV_ERROR;
+    }
+
+    switch (param)
+    {
+    case NERV_PID_PARAM_KP:
+        if (value < 0.0f)
+        {
+            return NERV_ERROR;
+        }
+        self->config.kp = value;
+        break;
+
+    case NERV_PID_PARAM_KI:
+        if (value < 0.0f)
+        {
+            return NERV_ERROR;
+        }
+        self->config.ki = value;
+        break;
+
+    case NERV_PID_PARAM_KD:
+        if (value < 0.0f)
+        {
+            return NERV_ERROR;
+        }
+        self->config.kd = value;
+        break;
+
+    case NERV_PID_PARAM_OUTPUT_MIN:
+        if ((value >= self->config.output_max) || (value > 0.0f))
+        {
+            return NERV_ERROR;
+        }
+        self->config.output_min = value;
+        break;
+
+    case NERV_PID_PARAM_OUTPUT_MAX:
+        if ((value <= self->config.output_min) || (value < 0.0f))
+        {
+            return NERV_ERROR;
+        }
+        self->config.output_max = value;
+        break;
+
+    case NERV_PID_PARAM_INTEGRAL_MIN:
+        if (value >= self->config.integral_max)
+        {
+            return NERV_ERROR;
+        }
+        self->config.integral_min = value;
+        break;
+
+    case NERV_PID_PARAM_INTEGRAL_MAX:
+        if (value <= self->config.integral_min)
+        {
+            return NERV_ERROR;
+        }
+        self->config.integral_max = value;
+        break;
+
+    case NERV_PID_PARAM_INTEGRAL_ERROR_THRESHOLD:
+        if (value < 0.0f)
+        {
+            return NERV_ERROR;
+        }
+        self->config.integral_error_threshold = value;
+        break;
+
+    case NERV_PID_PARAM_DERIVATIVE_TAU_S:
+        if (value < 0.0f)
+        {
+            return NERV_ERROR;
+        }
+        self->config.derivative_tau_s = value;
+        break;
+
+    default:
+        return NERV_ERROR;
+    }
+
+    return NERV_OK;
+}

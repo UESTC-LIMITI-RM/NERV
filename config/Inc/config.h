@@ -71,6 +71,7 @@
 
 /**
   * @brief 禁用取值.
+  * @note  编译期开关取本值表示不编译; 运行期限幅与阈值类配置字段取本值表示关闭该限制.
   */
 #define NERV_DISABLE 0U
 
@@ -168,6 +169,22 @@
 #endif /* NERV_USE_MOTOR */
 
 #if (NERV_USE_CHASSIS == NERV_ENABLE)
+
+/* 底盘里程计功能裁剪开关. */
+
+#ifndef NERV_USE_CHASSIS_ODOMETRY
+/**
+  * @brief 底盘里程计功能裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  * @note  关闭时实例不含里程计字段, Update 不积分位置, NERV_Chassis_GetOdometry 与
+  *         NERV_Chassis_SetOdometry 不参与编译.
+  */
+#define NERV_USE_CHASSIS_ODOMETRY NERV_ENABLE
+#endif
+
+#if (NERV_USE_CHASSIS_ODOMETRY != NERV_ENABLE) && (NERV_USE_CHASSIS_ODOMETRY != NERV_DISABLE)
+#error "NERV_USE_CHASSIS_ODOMETRY must be NERV_ENABLE or NERV_DISABLE."
+#endif
 
 /* 底盘构型. 同一次编译只能选择一种. */
 

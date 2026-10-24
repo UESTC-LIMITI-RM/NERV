@@ -46,10 +46,22 @@ typedef enum
   */
 typedef void (*NERV_Log_OutputTypeDef)(const char *msg, uint16_t len, void *user);
 
+/**
+  * @brief  注册日志输出回调与上下文.
+  * @note   NOT ISR-safe. 替换全局输出回调, 不得与日志写入并发.
+  */
 NERV_StatusTypeDef NERV_Log_SetOutput(NERV_Log_OutputTypeDef output, void *user);
 
+/**
+  * @brief  输出一段定长日志.
+  * @note   NOT ISR-safe. 写入共享缓冲并调用输出回调.
+  */
 NERV_StatusTypeDef NERV_Log_Write(const char *msg, uint16_t len);
 
+/**
+  * @brief  按格式化串输出日志.
+  * @note   NOT ISR-safe. 可变参格式化并写入共享缓冲.
+  */
 NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level, const char *file, uint32_t line,
                                    const char *fmt, ...);
 

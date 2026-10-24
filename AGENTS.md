@@ -1122,7 +1122,7 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 
 - `Register` 只绑定配置, 函数指针与软件状态, 不访问硬件, 不分配内存.
 - `Init` 访问硬件, 由调用者在 MCU 与 FDCAN 初始化完成后调用.
-- 两者职责不得合并.
+- 两者职责不得合并. 模块没有硬件初始化步骤时 (如电机经 FDCAN 通信, 电调无需初始化命令) 可不设 `Register`, 由单个带 config 参数的 `Init` 完成校验, 派生与建立; 是否分两相由模块是否有硬件初始化步骤决定, 不默认拆分.
 - 库不规定 `Register` 与 `Init` 相对于 RTOS 启动的顺序.
 
 ### 9.5 扩展点选择
@@ -1681,7 +1681,7 @@ typedef struct
         const NERV_FDCAN_FilterTypeDef *filters,
         uint8_t count);
     NERV_StatusTypeDef (*transmit)(
-        NERV_FDCAN_InstanceTypeDef *self,
+        const NERV_FDCAN_InstanceTypeDef *self,
         const NERV_FDCAN_FrameTypeDef *frame);
     uint32_t (*get_error)(const NERV_FDCAN_InstanceTypeDef *self);
     void (*clear_error)(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
@@ -1709,7 +1709,7 @@ NERV_StatusTypeDef NERV_FDCAN_ConfigureFilter(
     uint8_t count);
 
 NERV_StatusTypeDef NERV_FDCAN_Transmit(
-    NERV_FDCAN_InstanceTypeDef *self,
+    const NERV_FDCAN_InstanceTypeDef *self,
     const NERV_FDCAN_FrameTypeDef *frame);
 
 NERV_StatusTypeDef NERV_FDCAN_RegisterRxCallback(

@@ -31,17 +31,22 @@ extern "C" {
   * @note   由调用方以静态存储提供, 生命周期必须覆盖实例生命周期.
   * @note   driver 与 bus 指向的对象由调用方提供, 绑定后只读.
   * @note   控制量的单位与语义由 driver 绑定的型号描述符约定, 本结构体不限定为电流.
+  * @note   一个电机实例只能由一个消费者持有. 多个消费者共用同一实例会互相覆盖控制
+  *         目标与监督计时, 导致控制不可预期.
   */
 typedef struct
 {
     const NERV_Motor_DriverTypeDef *driver; /**< 驱动绑定, 决定协议族与控制模式 */
     const NERV_FDCAN_InstanceTypeDef *bus;  /**< FDCAN 实例, 指令发送与反馈接收的通道 */
-    uint8_t device_id;        /**< 电调 id, 合法范围由驱动描述符的 id_min 与 id_max 决定 */
-    float gear_ratio;         /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
-    uint32_t offline_ms;      /**< 离线判定阈值, 单位 ms, 0 表示关闭离线判定 */
-    float over_temperature_c; /**< 电机过温阈值, 单位 ℃, 0 表示关闭过温检查 */
-    float control_limit;      /**< 控制量限幅, 单位由型号描述符约定, 0 表示不额外限幅 */
-    bool invert_direction;    /**< 安装方向取反, 指令与反馈统一乘符号 */
+    uint8_t device_id; /**< 电调 id, 合法范围由驱动描述符的 id_min 与 id_max 决定 */
+    float gear_ratio;  /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
+    uint32_t
+        offline_ms; /**< 离线判定阈值, 单位 ms, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭离线判定 */
+    float
+        over_temperature_c; /**< 电机过温阈值, 单位 ℃, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭过温检查 */
+    uint16_t
+        control_limit; /**< 控制量编码值上限, 量纲与型号描述符的 control_cmd_limit 相同 (如 16384, 25000), 全型号统一按编码值配置, 取 NERV_DISABLE 表示不额外限幅 */
+    bool invert_direction; /**< 安装方向取反, 指令与反馈统一乘符号 */
 } NERV_Motor_ConfigTypeDef;
 
 /**
@@ -93,22 +98,56 @@ typedef struct NERV_Motor_Instance
 NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
                                    const NERV_Motor_ConfigTypeDef *config);
 
+/**
+  * @brief  设置电机目标控制量.
+  * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
+  */
 NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target);
 
+/**
+  * @brief  刷新测量值, 运行在线监督并积分离线计时.
+  * @note   NOT ISR-safe. 写实例测量与错误位, 更新计时基准.
+  */
 NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
 
+/**
+  * @brief  按组刷新并下发一组电机的指令帧.
+  * @note   NOT ISR-safe. 遍历实例状态, 经总线发送.
+  */
 NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                           uint32_t now_ms);
 
+/**
+  * @brief  把接收到的反馈帧交给电机实例解析.
+  * @note   ISR-safe. 设计为在总线接收中断中调用, 只做拷贝, 置标志与有限的状态更新,
+  *         不阻塞, 不分配内存, 不调用日志.
+  */
 void NERV_Motor_OnRx(NERV_Motor_InstanceTypeDef *self, const NERV_FDCAN_FrameTypeDef *frame);
 
+/**
+  * @brief  读取电机机构系测量值.
+  * @note   NOT ISR-safe. 测量值由 Update 在任务上下文写入, 不应在中断中读取.
+  */
 NERV_StatusTypeDef NERV_Motor_GetMeasurement(const NERV_Motor_InstanceTypeDef *self,
                                              NERV_Motor_MeasurementTypeDef *measurement);
 
+/**
+  * @brief  读取电机粘滞错误位.
+  * @note   NOT ISR-safe. 错误位由任务上下文的 Update 与中断上下文的 OnRx 共同维护,
+  *         ISR 读取可能看到不一致状态.
+  */
 uint32_t NERV_Motor_GetError(const NERV_Motor_InstanceTypeDef *self);
 
+/**
+  * @brief  清除电机错误位.
+  * @note   NOT ISR-safe. 读改写实例错误位, 与 OnRx 可能竞争.
+  */
 void NERV_Motor_ClearError(NERV_Motor_InstanceTypeDef *self, uint32_t mask);
 
+/**
+  * @brief  进入安全状态, 目标清零.
+  * @note   NOT ISR-safe. 写实例状态.
+  */
 NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self);
 
 #ifdef __cplusplus

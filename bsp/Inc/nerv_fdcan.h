@@ -245,7 +245,8 @@ static inline NERV_StatusTypeDef NERV_FDCAN_ConfigureFilter(NERV_FDCAN_InstanceT
   *         未与 NERV_FDCAN_FLAG_FD 同时使用, len 超出帧类型允许的长度, id 超出
   *         标志位允许的位宽, 或平台发送失败.
   * @note   非阻塞. 返回 NERV_OK 只表示帧进入发送流程, 不代表对端已接收.
-  * @note   能否在中断中调用由平台适配层约定.
+  * @note   ISR-safe. 本函数只做参数检查与操作表分发, 不修改实例状态, 可在中断中调用,
+  *         前提是平台适配层的 transmit 实现也 ISR-safe.
   */
 static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(const NERV_FDCAN_InstanceTypeDef *self,
                                                      const NERV_FDCAN_FrameTypeDef *frame)
@@ -325,6 +326,7 @@ NERV_FDCAN_RegisterRxCallback(NERV_FDCAN_InstanceTypeDef *self,
   * @note   由平台适配层在接收中断中调用. 未注册回调时丢弃该帧.
   * @note   只读取回调与上下文并转发, 不阻塞, 不分配内存, 不调用日志.
   * @note   设计为在中断上下文中调用, 因此已注册的回调必须 ISR-safe.
+  * @note   ISR-safe. 本函数自身只读取并转发回调, 不阻塞, 不分配内存, 不调用日志.
   */
 static inline void NERV_FDCAN_OnRx(NERV_FDCAN_InstanceTypeDef *self,
                                    const NERV_FDCAN_FrameTypeDef *frame)
@@ -355,6 +357,7 @@ static inline void NERV_FDCAN_OnRx(NERV_FDCAN_InstanceTypeDef *self,
   *         NERV_ERR_NONE.
   * @note   读取不清除错误位.
   * @note   错误位由平台适配层在中断中置位, 读取与清除的原子性由平台适配层保证.
+  * @note   ISR-safe. 只读转发, 不修改实例状态.
   */
 static inline uint32_t NERV_FDCAN_GetError(const NERV_FDCAN_InstanceTypeDef *self)
 {
@@ -381,6 +384,8 @@ static inline uint32_t NERV_FDCAN_GetError(const NERV_FDCAN_InstanceTypeDef *sel
   * @param  mask 待清除的错误位掩码. 只使用低 24 位, 高 8 位域号被忽略.
   * @note   只清除 mask 中置位的错误位, 未置位的错误位保持不变.
   * @note   self 为 NULL 或操作表未绑定时为空操作.
+  * @note   ISR-safe. 本函数只转发并掩码, 不修改实例状态, 可在中断中调用, 前提是平台
+  *         适配层的 clear_error 实现也 ISR-safe.
   */
 static inline void NERV_FDCAN_ClearError(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask)
 {

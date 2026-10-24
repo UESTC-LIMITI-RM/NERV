@@ -81,14 +81,30 @@ typedef struct
     float dt_s;              /**< 控制周期, 单位 s, 必须大于 0 */
 } NERV_PID_CascadeInputTypeDef;
 
+/**
+  * @brief  绑定 PID 配置并进入就绪状态.
+  * @note   NOT ISR-safe. 写实例状态.
+  */
 NERV_StatusTypeDef NERV_PID_Init(NERV_PID_InstanceTypeDef *self,
                                  const NERV_PID_ConfigTypeDef *config);
 
+/**
+  * @brief  清空 PID 积分项与微分状态, 输出回到安全零值.
+  * @note   NOT ISR-safe. 写实例状态.
+  */
 NERV_StatusTypeDef NERV_PID_Reset(NERV_PID_InstanceTypeDef *self);
 
+/**
+  * @brief  单环 PID 步进, 更新积分与微分并输出控制量.
+  * @note   NOT ISR-safe. 读写实例状态, 且与积分项累加相关的调用必须在同一周期上下文中.
+  */
 NERV_StatusTypeDef NERV_PID_Update(NERV_PID_InstanceTypeDef *self, float setpoint,
                                    float measurement, float feedforward, float dt_s, float *output);
 
+/**
+  * @brief  串级 PID 步进, 外环输出作为内环设定值.
+  * @note   NOT ISR-safe. 读写内外环实例状态.
+  */
 NERV_StatusTypeDef NERV_PID_UpdateCascade(NERV_PID_InstanceTypeDef *outer,
                                           NERV_PID_InstanceTypeDef *inner,
                                           const NERV_PID_CascadeInputTypeDef *input, float *output);

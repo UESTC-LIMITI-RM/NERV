@@ -33,7 +33,7 @@ typedef struct NERV_Motor_Fb
 {
     float angle_rad;      /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
     float speed_radps;    /**< 转子转速, 单位 rad/s, 逆时针为正. */
-    float current_a;      /**< 实际输出转矩, 电调以电流值上报, 单位 A, 正值对应转速正方向. */
+    float current_a;      /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. */
     int8_t temperature_c; /**< 电机温度, 单位 ℃. 由电调上报, 可用性取决于温度传感器与电调固件. */
 } NERV_Motor_FbTypeDef;
 
@@ -63,7 +63,7 @@ typedef struct
     uint8_t frame_len;            /**< 控制帧与反馈帧数据长度, 单位 byte */
     uint8_t fb_angle_off;         /**< 反馈帧转子角度字段偏移, uint16 大端 */
     uint8_t fb_speed_off;         /**< 反馈帧转速字段偏移, int16 大端, 单位 rpm */
-    uint8_t fb_torque_off;        /**< 反馈帧实际输出转矩字段偏移, int16 大端 */
+    uint8_t fb_current_off;       /**< 反馈帧实际输出电流字段偏移, int16 大端, 单位 A */
     uint8_t fb_temperature_off;   /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
     uint16_t angle_count;         /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
     float control_full_scale;     /**< 控制指令满量程, 单位由协议族约定, 编码满量程对应本值 */

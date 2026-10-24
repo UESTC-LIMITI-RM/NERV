@@ -49,8 +49,9 @@ typedef struct NERV_Motor_Fb
   *         刻度. 协议族代码只读描述符, 不包含型号分支.
   * @note   描述符由协议族驱动以常量给出, 实例只读, 不得修改.
   * @note   控制帧与反馈帧标识符均为 11 位标准帧标识符, 高位必须为 0.
-  * @note   控制量的单位与语义由协议族约定. 控制指令与反馈中的控制量字段分别由
-  *         control_full_scale 与 fb_control_full_scale 给出编码, 两者相互独立.
+  * @note   控制量的单位与语义由型号描述符决定, 同一协议族的不同控制模式可以不同.
+  *         控制指令与反馈中的控制量字段分别由 control_full_scale 与
+  *         fb_control_full_scale 给出编码, 两者相互独立.
   */
 typedef struct
 {
@@ -62,8 +63,8 @@ typedef struct
     uint8_t motors_per_frame;     /**< 单条控制帧控制的电机数量 */
     uint8_t frame_len;            /**< 控制帧与反馈帧数据长度, 单位 byte */
     uint8_t fb_angle_off;         /**< 反馈帧转子角度字段偏移, uint16 大端 */
-    uint8_t fb_speed_off;         /**< 反馈帧转速字段偏移, int16 大端, 单位 rpm */
-    uint8_t fb_current_off;       /**< 反馈帧实际输出电流字段偏移, int16 大端, 单位 A */
+    uint8_t fb_speed_off;         /**< 反馈帧转速字段偏移, int16 大端 */
+    uint8_t fb_current_off;       /**< 反馈帧实际输出电流字段偏移, int16 大端 */
     uint8_t fb_temperature_off;   /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
     uint16_t angle_count;         /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
     float control_full_scale;     /**< 控制指令满量程, 单位由协议族约定, 编码满量程对应本值 */

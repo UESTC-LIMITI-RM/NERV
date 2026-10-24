@@ -239,11 +239,11 @@ module/motor/driver/DJI/nerv_motor_driver_dji.c
 - [x] 驱动分层: driver 接口在 `nerv_motor_driver.h`, 每个协议族一个 `module/motor/driver/<vendor>/nerv_motor_driver_<vendor>.c`; 族内型号差异全部放进 `NERV_Motor_ModelTypeDef` 描述符, 新增型号只增加一个描述符常量与一个 `NERV_Motor_DriverTypeDef` 实例, 不增加函数与宏; 驱动在实例配置中绑定, 同一次编译允许混用多个协议族的多个型号, 主逻辑不含型号分支, 不再做全局编译期单选.
 - [x] 模块公开头文件由 `NERV_USE_MOTOR` 条件编译, 模块关闭时 `nerv_motor_driver.h` 内容为空.
 - [x] 协议族驱动整体由 `NERV_USE_MOTOR` 与 `NERV_USE_MOTOR_<VENDOR>` 条件编译, 协议族关闭时驱动源文件不产生代码, `nerv_motor_driver.h` 中对应的驱动符号也不可见.
-- [x] `driver/DJI/nerv_motor_driver_dji.c`: DJI CAN 电调协议族实现与 M3508 (C620 电调), M2006 (C610 电调), GM6020 (电流与电压两种控制模式各一个驱动实例) 型号描述符, 帧 ID 分组, 显式大端编解码, 驱动层满量程限幅, 温度饱和与参数防御; 控制指令与反馈中控制量字段的编码在描述符中分开表达; 临时数值测试覆盖帧分组, 编解码字节布局与限幅.
-- [x] `nerv_motor.h`: 实例结构体, 配置结构体, 机构系状态类型与对外函数声明. 配置字段含 `driver` 驱动绑定, `bus` 与 `device_id` 传输与标识, `gear_ratio` 减速比 (必须大于 0), `offline_ms` 离线判定阈值 (0 关闭), `over_temperature_c` 过温阈值 (0 关闭), `control_limit` 控制量限幅 (0 不额外限幅), `invert_direction` 安装方向取反; 控制量的单位与语义由协议族约定, 不限定为电流. 接口: Register, Init, SetTarget, Update, OnRx, GetState, GetError, ClearError, EnterSafeState.
+- [x] `driver/DJI/nerv_motor_driver_dji.c`: DJI CAN 电调协议族实现与 M3508 (C620 电调), M2006 (C610 电调), GM6020 (电流与电压两种控制模式各一个驱动实例) 型号描述符, 帧 ID 分组, 显式大端编解码, 驱动层满量程限幅, 温度有符号透传与参数防御; 控制指令与反馈中控制量字段的编码在描述符中分开表达; 无温度字段的型号 (C610) 以 NERV_MOTOR_FB_OFF_NONE 表达, 解码置 INT8_MIN; 临时数值测试覆盖帧分组, 编解码字节布局与限幅.
+- [x] `nerv_motor.h`: 实例结构体, 配置结构体, 机构系测量值类型与对外函数声明. 配置字段含 `driver` 驱动绑定, `bus` 与 `device_id` 传输与标识, `gear_ratio` 减速比 (必须大于 0), `offline_ms` 离线判定阈值 (0 关闭), `over_temperature_c` 过温阈值 (0 关闭), `control_limit` 控制量限幅 (0 不额外限幅), `invert_direction` 安装方向取反; 控制量的单位与语义由协议族约定, 不限定为电流. 接口: Init (带 config, 电机无硬件初始化阶段, 不设 Register), SetTarget, Update, UpdateGroup, OnRx, GetMeasurement, GetError, ClearError, EnterSafeState. 指令按帧标识符分组发送, 同一标识符每周期只发一帧, 避免同组电调互相清零.
 - [ ] 反馈解析显式按字节偏移编码与解码, 不把协议缓冲区直接覆盖成结构体.
 - [ ] 转速换算链路: 原始反馈值, 电机转速, 输出轴转速, 三级量纲分清, 单位换算只调用 `NERV_Utils_*`.
-- [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`. 过温检查以 `over_temperature_c` 大于 0 为前提, 温度数据不可靠的机构关闭该检查, 由电调自身过温保护兜底.
+- [ ] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`. 过温检查以 `over_temperature_c` 大于 0 为前提; 反馈温度为电机温度, 由电调上报, 可用性取决于温度传感器与电调固件, 数据不可靠的机构关闭该检查, 仅剩电调自身的温度保护兜底.
 - [ ] 控制量指令按可配置上限限幅, 上限取实例配置的 `control_limit`, 0 表示不额外限幅. 过流由电调自身保护兜底, 库不设过流错误位.
 - [ ] 提供 `NERV_Motor_EnterSafeState`, 清零目标值与输出.
 - [ ] 通信超时判定使用 `NERV_UTILS_TIMEOUT_MS`, 阈值取实例配置的 `offline_ms`, 0 表示关闭离线判定.

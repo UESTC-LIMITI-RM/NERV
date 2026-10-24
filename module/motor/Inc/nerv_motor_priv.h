@@ -36,11 +36,21 @@ extern "C" {
   */
 #define __NERV_MOTOR_DIRECTION_SIGN_INVERTED (-1.0f)
 
+/* 限幅与阈值类配置取 NERV_DISABLE 表示关闭, 取大于 0 的有限值表示启用.
+ * 浮点字段用 F 版, 无符号整型字段用 U 版. */
+#define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
+#define __NERV_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
+
+/** @brief 控制量编码值上限, 即 16 位有符号编码的正半轴. */
+#define __NERV_MOTOR_CONTROL_LIMIT_MAX 32767U
+
 /* ========================================================================== */
 /* 电机模块内部实现常数定义区结束                                             */
 /* ========================================================================== */
 
 /* 内部辅助函数, 只供模块源文件使用, 不进入公开接口. */
+
+static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
 
@@ -59,6 +69,12 @@ static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_
 
 static bool NERV_Motor_SameGroup(const NERV_Motor_InstanceTypeDef *lhs,
                                  const NERV_Motor_InstanceTypeDef *rhs);
+
+static void NERV_Motor_SetGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
+                                      uint8_t first);
+
+static void NERV_Motor_ClearGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
+                                        uint8_t first);
 
 static NERV_StatusTypeDef NERV_Motor_ValidateGroups(NERV_Motor_InstanceTypeDef *const *members,
                                                     uint8_t count);

@@ -49,46 +49,48 @@
   * @note   本族控制量为电流, 单位 A. C620 量程 20 A, 编码满量程 16384.
   */
 static const NERV_Motor_ModelTypeDef dji_model_3508 = {
-    .tx_id_low = 0x200U,
-    .tx_id_high = 0x1FFU,
-    .rx_id_base = 0x200U,
-    .id_min = 1U,
-    .id_max = 8U,
-    .motors_per_frame = 4U,
-    .frame_len = 8U,
-    .fb_angle_off = 0U,
-    .fb_speed_off = 2U,
-    .fb_torque_off = 4U,
-    .fb_temperature_off = 6U,
-    .angle_count = 8192U,
-    .control_full_scale = 20.0f,
-    .control_cmd_limit = 16384,
+    .tx_id_low             = 0x200U,
+    .tx_id_high            = 0x1FFU,
+    .rx_id_base            = 0x200U,
+    .id_min                = 1U,
+    .id_max                = 8U,
+    .motors_per_frame      = 4U,
+    .frame_len             = 8U,
+    .fb_angle_off          = 0U,
+    .fb_speed_off          = 2U,
+    .fb_current_off        = 4U,
+    .fb_temperature_off    = 6U,
+    .angle_count           = 8192U,
+    .control_full_scale    = 20.0f,
+    .control_cmd_limit     = 16384,
     .fb_control_full_scale = 20.0f,
-    .fb_control_cmd_limit = 16384,
+    .fb_control_cmd_limit  = 16384,
 };
 
 /**
   * @brief  DJI M2006 电机 (C610 电调) 型号描述符.
   * @note   标识符规则同 M3508. 本族控制量为电流, 单位 A. C610 量程 10 A,
   *         编码满量程 10000, 与 C620 的 20 A, 16384 不同, 这是两型号的主要差异.
+  * @note   C610 反馈帧无温度字段, fb_temperature_off 取 NERV_MOTOR_FB_OFF_NONE,
+  *         解码后 temperature_c 为 INT8_MIN.
   */
 static const NERV_Motor_ModelTypeDef dji_model_2006 = {
-    .tx_id_low = 0x200U,
-    .tx_id_high = 0x1FFU,
-    .rx_id_base = 0x200U,
-    .id_min = 1U,
-    .id_max = 8U,
-    .motors_per_frame = 4U,
-    .frame_len = 8U,
-    .fb_angle_off = 0U,
-    .fb_speed_off = 2U,
-    .fb_torque_off = 4U,
-    .fb_temperature_off = 6U,
-    .angle_count = 8192U,
-    .control_full_scale = 10.0f,
-    .control_cmd_limit = 10000,
+    .tx_id_low             = 0x200U,
+    .tx_id_high            = 0x1FFU,
+    .rx_id_base            = 0x200U,
+    .id_min                = 1U,
+    .id_max                = 8U,
+    .motors_per_frame      = 4U,
+    .frame_len             = 8U,
+    .fb_angle_off          = 0U,
+    .fb_speed_off          = 2U,
+    .fb_current_off        = 4U,
+    .fb_temperature_off    = NERV_MOTOR_FB_OFF_NONE,
+    .angle_count           = 8192U,
+    .control_full_scale    = 10.0f,
+    .control_cmd_limit     = 10000,
     .fb_control_full_scale = 10.0f,
-    .fb_control_cmd_limit = 10000,
+    .fb_control_cmd_limit  = 10000,
 };
 
 /**
@@ -96,25 +98,25 @@ static const NERV_Motor_ModelTypeDef dji_model_2006 = {
   * @note   控制帧按 4 个电机共用一条: 设备 id 1 到 4 用 tx_id_low, id 5 到 7 用
   *         tx_id_high. 反馈帧标识符等于 rx_id_base 加设备 id.
   * @note   本模式控制量为电流, 单位 A, 编码 [-16384, 16384] 对应 [-3, 3] A.
-  *         反馈中的控制量字段为转矩电流, 编码相同.
+  *         反馈中的控制量字段为实际输出电流, 编码相同.
   */
 static const NERV_Motor_ModelTypeDef dji_model_6020_current = {
-    .tx_id_low = 0x1FEU,
-    .tx_id_high = 0x2FEU,
-    .rx_id_base = 0x204U,
-    .id_min = 1U,
-    .id_max = 7U,
-    .motors_per_frame = 4U,
-    .frame_len = 8U,
-    .fb_angle_off = 0U,
-    .fb_speed_off = 2U,
-    .fb_torque_off = 4U,
-    .fb_temperature_off = 6U,
-    .angle_count = 8192U,
-    .control_full_scale = 3.0f,
-    .control_cmd_limit = 16384,
+    .tx_id_low             = 0x1FEU,
+    .tx_id_high            = 0x2FEU,
+    .rx_id_base            = 0x204U,
+    .id_min                = 1U,
+    .id_max                = 7U,
+    .motors_per_frame      = 4U,
+    .frame_len             = 8U,
+    .fb_angle_off          = 0U,
+    .fb_speed_off          = 2U,
+    .fb_current_off        = 4U,
+    .fb_temperature_off    = 6U,
+    .angle_count           = 8192U,
+    .control_full_scale    = 3.0f,
+    .control_cmd_limit     = 16384,
     .fb_control_full_scale = 3.0f,
-    .fb_control_cmd_limit = 16384,
+    .fb_control_cmd_limit  = 16384,
 };
 
 /**
@@ -123,25 +125,25 @@ static const NERV_Motor_ModelTypeDef dji_model_6020_current = {
   *         tx_id_high. 反馈帧与电流模式相同.
   * @note   本模式控制量为电压给定值, 范围 [-25000, 25000], 协议未定义给定值与
   *         实际输出电压的对应关系, 调用方按协议给定值使用. 反馈中的控制量字段
-  *         仍是转矩电流, 编码与电流模式相同, 与指令编码不同.
+  *         仍是实际输出电流, 编码与电流模式相同, 与指令编码不同.
   */
 static const NERV_Motor_ModelTypeDef dji_model_6020_voltage = {
-    .tx_id_low = 0x1FFU,
-    .tx_id_high = 0x2FFU,
-    .rx_id_base = 0x204U,
-    .id_min = 1U,
-    .id_max = 7U,
-    .motors_per_frame = 4U,
-    .frame_len = 8U,
-    .fb_angle_off = 0U,
-    .fb_speed_off = 2U,
-    .fb_torque_off = 4U,
-    .fb_temperature_off = 6U,
-    .angle_count = 8192U,
-    .control_full_scale = 25000.0f,
-    .control_cmd_limit = 25000,
+    .tx_id_low             = 0x1FFU,
+    .tx_id_high            = 0x2FFU,
+    .rx_id_base            = 0x204U,
+    .id_min                = 1U,
+    .id_max                = 7U,
+    .motors_per_frame      = 4U,
+    .frame_len             = 8U,
+    .fb_angle_off          = 0U,
+    .fb_speed_off          = 2U,
+    .fb_current_off        = 4U,
+    .fb_temperature_off    = 6U,
+    .angle_count           = 8192U,
+    .control_full_scale    = 25000.0f,
+    .control_cmd_limit     = 25000,
     .fb_control_full_scale = 3.0f,
-    .fb_control_cmd_limit = 16384,
+    .fb_control_cmd_limit  = 16384,
 };
 
 /**
@@ -168,7 +170,7 @@ static uint16_t NERV_Motor_Dji_ReadBE16(const uint8_t *data, uint8_t offset)
   */
 static void NERV_Motor_Dji_WriteBE16(uint8_t *data, uint8_t offset, uint16_t value)
 {
-    data[offset] = (uint8_t)(value >> __NERV_MOTOR_DJI_BYTE_BITS);
+    data[offset]      = (uint8_t)(value >> __NERV_MOTOR_DJI_BYTE_BITS);
     data[offset + 1U] = (uint8_t)(value & 0xFFU);
 }
 
@@ -203,7 +205,7 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
 
     geo->tx_id = (index < model->motors_per_frame) ? model->tx_id_low : model->tx_id_high;
     geo->rx_id = model->rx_id_base + device_id;
-    geo->len = model->frame_len;
+    geo->len   = model->frame_len;
 
     return NERV_OK;
 }
@@ -222,8 +224,7 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
   * @note   ISR-safe.
   */
 static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef *model,
-                                                  uint8_t *frame, uint8_t device_id,
-                                                  float control)
+                                                  uint8_t *frame, uint8_t device_id, float control)
 {
     float current_clamped_a;
     int32_t raw;
@@ -239,11 +240,11 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    current_clamped_a = NERV_Math_Clamp(control, -model->control_full_scale,
-                                        model->control_full_scale);
+    current_clamped_a =
+        NERV_Math_Clamp(control, -model->control_full_scale, model->control_full_scale);
 
-    raw = (int32_t)(current_clamped_a * (float)model->control_cmd_limit /
-                    model->control_full_scale);
+    raw =
+        (int32_t)(current_clamped_a * (float)model->control_cmd_limit / model->control_full_scale);
 
     offset = (uint8_t)(((device_id - model->id_min) % model->motors_per_frame) *
                        __NERV_MOTOR_DJI_MOTOR_BYTES);
@@ -263,7 +264,8 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
   * @retval NERV_ERROR model, frame 或 fb 为 NULL, len 与 frame_len 不一致,
   *         或转子机械角度编码超出协议范围.
   * @note   多字节字段按大端顺序显式拼接, 不依赖主机字节序.
-  * @note   温度字段为 uint8, 超过 INT8_MAX 时按 INT8_MAX 饱和输出.
+  * @note   温度字段为有符号 int8, 原值透传, 协议不表达 127 ℃ 以上的温度; 型号无
+  *         温度字段时 temperature_c 置 INT8_MIN, 不读取帧数据.
   * @note   ISR-safe.
   */
 static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef *model,
@@ -272,8 +274,7 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
 {
     uint16_t angle_raw;
     uint16_t speed_raw;
-    uint16_t torque_raw;
-    uint8_t temperature_raw;
+    uint16_t current_raw;
 
     if ((NULL == model) || (NULL == frame) || (NULL == fb))
     {
@@ -292,21 +293,22 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    speed_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_speed_off);
-    torque_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_torque_off);
-    temperature_raw = frame[model->fb_temperature_off];
+    speed_raw   = NERV_Motor_Dji_ReadBE16(frame, model->fb_speed_off);
+    current_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_current_off);
 
-    fb->angle_rad = (float)angle_raw * NERV_MATH_TWO_PI / (float)model->angle_count;
+    fb->angle_rad   = (float)angle_raw * NERV_MATH_TWO_PI / (float)model->angle_count;
     fb->speed_radps = NERV_Utils_RpmToRadps((float)(int16_t)speed_raw);
-    fb->current_a = (float)(int16_t)torque_raw / (float)model->fb_control_cmd_limit *
-                    model->fb_control_full_scale;
+    fb->current_a   = (float)(int16_t)current_raw / (float)model->fb_control_cmd_limit *
+                      model->fb_control_full_scale;
 
-    if (temperature_raw > (uint8_t)INT8_MAX)
+    if (model->fb_temperature_off == NERV_MOTOR_FB_OFF_NONE)
     {
-        temperature_raw = (uint8_t)INT8_MAX;
+        fb->temperature_c = INT8_MIN;
     }
-
-    fb->temperature_c = (int8_t)temperature_raw;
+    else
+    {
+        fb->temperature_c = (int8_t)frame[model->fb_temperature_off];
+    }
 
     return NERV_OK;
 }
@@ -314,31 +316,31 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
 /** @brief DJI CAN 电调协议族操作表. */
 static const NERV_Motor_Driver_OpsTypeDef dji_ops = {
     .get_frame_geo = NERV_Motor_Dji_GetFrameGeo,
-    .encode_tx = NERV_Motor_Dji_EncodeTx,
-    .decode_fb = NERV_Motor_Dji_DecodeFb,
+    .encode_tx     = NERV_Motor_Dji_EncodeTx,
+    .decode_fb     = NERV_Motor_Dji_DecodeFb,
 };
 
 /** @brief DJI M3508 电机 (C620 电调) 驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji3508 = {
-    .ops = &dji_ops,
+    .ops   = &dji_ops,
     .model = &dji_model_3508,
 };
 
 /** @brief DJI M2006 电机 (C610 电调) 驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji2006 = {
-    .ops = &dji_ops,
+    .ops   = &dji_ops,
     .model = &dji_model_2006,
 };
 
 /** @brief DJI GM6020 电机电流控制模式驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current = {
-    .ops = &dji_ops,
+    .ops   = &dji_ops,
     .model = &dji_model_6020_current,
 };
 
 /** @brief DJI GM6020 电机电压控制模式驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage = {
-    .ops = &dji_ops,
+    .ops   = &dji_ops,
     .model = &dji_model_6020_voltage,
 };
 

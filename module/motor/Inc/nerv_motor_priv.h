@@ -57,6 +57,12 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
 
 static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
 
+static bool NERV_Motor_SameGroup(const NERV_Motor_InstanceTypeDef *lhs,
+                                 const NERV_Motor_InstanceTypeDef *rhs);
+
+static NERV_StatusTypeDef NERV_Motor_ValidateGroups(NERV_Motor_InstanceTypeDef *const *members,
+                                                    uint8_t count);
+
 static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeDef *const *members,
                                                         uint8_t count, uint8_t first);
 

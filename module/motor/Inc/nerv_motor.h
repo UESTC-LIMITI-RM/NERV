@@ -30,7 +30,7 @@ extern "C" {
   * @brief  电机实例配置.
   * @note   由调用方以静态存储提供, 生命周期必须覆盖实例生命周期.
   * @note   driver 与 bus 指向的对象由调用方提供, 绑定后只读.
-  * @note   控制量的单位与语义由 driver 的协议族约定, 本结构体不限定为电流.
+  * @note   控制量的单位与语义由 driver 绑定的型号描述符约定, 本结构体不限定为电流.
   */
 typedef struct
 {
@@ -40,7 +40,7 @@ typedef struct
     float gear_ratio;         /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
     uint32_t offline_ms;      /**< 离线判定阈值, 单位 ms, 0 表示关闭离线判定 */
     float over_temperature_c; /**< 电机过温阈值, 单位 ℃, 0 表示关闭过温检查 */
-    float control_limit;      /**< 控制量限幅, 单位由协议族约定, 0 表示不额外限幅 */
+    float control_limit;      /**< 控制量限幅, 单位由型号描述符约定, 0 表示不额外限幅 */
     bool invert_direction;    /**< 安装方向取反, 指令与反馈统一乘符号 */
 } NERV_Motor_ConfigTypeDef;
 
@@ -56,7 +56,7 @@ typedef struct NERV_Motor_Measurement
 {
     float angle_rad;      /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 范围 [0, 2π) */
     float speed_radps;    /**< 输出轴角速度, 单位 rad/s, 机构正方向为正 */
-    float control;        /**< 控制量反馈, 单位由协议族约定, 机构正方向为正 */
+    float control;        /**< 控制量反馈, 单位由型号描述符约定, 机构正方向为正 */
     int8_t temperature_c; /**< 电机温度, 单位 ℃ */
 } NERV_Motor_MeasurementTypeDef;
 
@@ -81,6 +81,7 @@ typedef struct NERV_Motor_Instance
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */
     float target;                              /**< 控制量目标, 由 NERV_Motor_SetTarget 写入 */
     uint32_t last_rx_ms;                       /**< 最近一次有效反馈的时刻, 单位 ms */
+    bool offline_armed;                        /**< 离线监督已建立计时起点, 由模块维护 */
     bool initialized;                          /**< 初始化完成标志, 由 NERV_Motor_Init 置位 */
     bool fb_fresh;                             /**< 有新反馈待结算, 中断置位, Update 清除 */
 } NERV_Motor_InstanceTypeDef;

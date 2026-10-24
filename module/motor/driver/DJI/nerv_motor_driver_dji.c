@@ -46,7 +46,8 @@
   * @brief  DJI M3508 电机 (C620 电调) 型号描述符.
   * @note   控制帧按 4 个电调共用一条: 设备 id 1 到 4 用 tx_id_low, id 5 到 8 用
   *         tx_id_high. 反馈帧标识符等于 rx_id_base 加设备 id.
-  * @note   本族控制量为电流, 单位 A. C620 量程 20 A, 编码满量程 16384.
+  * @note   本型号控制量为电流, 单位 A. C620 量程 20 A, 编码满量程 16384.
+  * @note   数值依据 RoboMaster C620 无刷电机调速器使用说明 V1.01.
   */
 static const NERV_Motor_ModelTypeDef dji_model_3508 = {
     .tx_id_low             = 0x200U,
@@ -69,7 +70,7 @@ static const NERV_Motor_ModelTypeDef dji_model_3508 = {
 
 /**
   * @brief  DJI M2006 电机 (C610 电调) 型号描述符.
-  * @note   标识符规则同 M3508. 本族控制量为电流, 单位 A. C610 量程 10 A,
+  * @note   标识符规则同 M3508. 本型号控制量为电流, 单位 A. C610 量程 10 A,
   *         编码满量程 10000, 与 C620 的 20 A, 16384 不同, 这是两型号的主要差异.
   * @note   C610 反馈帧无温度字段, fb_temperature_off 取 NERV_MOTOR_FB_OFF_NONE,
   *         解码后 temperature_c 为 INT8_MIN.
@@ -215,7 +216,8 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
   * @param  model 型号描述符, 不得为 NULL.
   * @param  frame 控制帧数据缓冲, 长度不小于 model 的 frame_len, 不得为 NULL.
   * @param  device_id 电调 id, 范围 model 的 id_min 到 id_max.
-  * @param  control 控制量, 单位与语义由协议族约定, 本族为电流, 单位 A.
+  * @param  control 控制量, 单位与语义由型号描述符约定: 电流模式为 A, 电压模式为
+  *                 协议给定值.
   * @retval NERV_OK 编码成功, frame 中该电调对应位置已写入大端 int16 编码.
   * @retval NERV_ERROR model 或 frame 为 NULL, device_id 越界, 或 control 为非有限值.
   * @note   编码关系为 control_cmd_limit 对应 control_full_scale.
@@ -226,7 +228,7 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
 static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef *model,
                                                   uint8_t *frame, uint8_t device_id, float control)
 {
-    float current_clamped_a;
+    float control_clamped;
     int32_t raw;
     uint8_t offset;
 
@@ -240,14 +242,13 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    current_clamped_a =
+    control_clamped =
         NERV_Math_Clamp(control, -model->control_full_scale, model->control_full_scale);
 
-    raw =
-        (int32_t)(current_clamped_a * (float)model->control_cmd_limit / model->control_full_scale);
+    raw = (int32_t)(control_clamped * (float)model->control_cmd_limit / model->control_full_scale);
 
-    offset = (uint8_t)(((device_id - model->id_min) % model->motors_per_frame) *
-                       __NERV_MOTOR_DJI_MOTOR_BYTES);
+    offset = (uint8_t)(((uint32_t)(device_id - model->id_min) % (uint32_t)model->motors_per_frame) *
+                       (uint32_t)__NERV_MOTOR_DJI_MOTOR_BYTES);
 
     NERV_Motor_Dji_WriteBE16(frame, offset, (uint16_t)(int16_t)raw);
 

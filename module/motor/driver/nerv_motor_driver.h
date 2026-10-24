@@ -74,6 +74,16 @@ typedef struct
 } NERV_Motor_ModelTypeDef;
 
 /**
+  * @brief  把控制量物理量换算为电机控制编码.
+  * @note   线性比例 control_cmd_limit / control_full_scale. 物理量的单位必须与型号描述符
+  *         control_full_scale 一致 (电流模式为 A, 电压模式为协议给定值). 结果为有符号控制
+  *         编码, 范围约 ±control_cmd_limit. 调用方可借此把物理量目标转换为控制编码后传给
+  *         NERV_Motor_SetTarget, 从而以物理量配置, 由电机层以控制编码下发.
+  */
+#define NERV_Motor_CmdFromPhysical(_model, _physical) \
+    ((float)(_physical) * (float)(_model)->control_cmd_limit / (_model)->control_full_scale)
+
+/**
   * @brief  电机帧几何信息.
   * @note   由 get_frame_geo 一次给出, 调用方无需分多次查询标识符与长度.
   */
@@ -92,10 +102,10 @@ typedef struct
   *         - get_frame_geo: 由设备 id 给出控制帧标识符, 反馈帧标识符与帧长.
   *                          model 或 geo 为 NULL, device_id 越界时返回 NERV_ERROR
   *                          且不修改 geo. ISR-safe.
-  *         - encode_tx: 把一个设备的控制量编码到控制帧内该设备对应的位置, 帧缓冲
+  *         - encode_tx: 把一个设备的控制编码编码到控制帧内该设备对应的位置, 帧缓冲
   *                       由调用方清零后传入, 驱动只写入该设备占用的字节, 失败时不
-  *                       修改帧缓冲. 本函数只按 control_full_scale 限幅到协议满
-  *                       量程, 实例级限幅由调用方在调用前完成. ISR-safe.
+  *                       修改帧缓冲. 本函数只按 control_cmd_limit 把控制编码限幅到
+  *                       协议满量程, 实例级限幅由调用方在调用前完成. ISR-safe.
   *         - decode_fb: 把反馈帧解码为电机反馈, len 必须等于 model 的 frame_len,
   *                      失败时不修改输出结构. 温度按有符号 int8 透传, 型号无温度
   *                      字段时置 INT8_MIN. ISR-safe.
@@ -156,6 +166,8 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current;
   * @warning 反馈帧标识符区间 0x205 到 0x20B 与 C620, C610 电调 id 5 到 8 的反馈区间
   *           0x205 到 0x208 重叠, 同总线混编时会互相误收, 使用时必须错开设备 id
   *           或避开混编.
+  * @warning 本型号的控制量单位是协议给定值 (满量程 25000, 无量纲), 不是电流. 电机实例
+  *           配置的 control_limit 按同单位解释, 按电流安培数配置会得到近乎为零的输出.
   */
 extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage;
 

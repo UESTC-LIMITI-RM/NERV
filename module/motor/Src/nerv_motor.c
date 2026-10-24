@@ -29,9 +29,9 @@
   * @retval NERV_OK 配置已绑定, 帧几何信息已缓存, 实例进入就绪状态.
   * @retval NERV_ERROR self 或 config 为 NULL, config 的 driver, driver 的 model,
   *         driver 的 ops, ops 的 get_frame_geo, encode_tx, decode_fb 或 bus 为 NULL,
-  *         gear_ratio 不为大于 0 的有限值, over_temperature_c 与 control_limit 为负
-  *         或非有限值, device_id 超出描述符的 id_min 到 id_max 范围, 或帧几何信息
-  *         的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
+  *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
+  *         control_limit 超过 32767, device_id 超出描述符的 id_min 到 id_max 范围,
+  *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
   * @note   不直接访问外设: 电调无需初始化指令, 帧几何信息只经驱动操作表派生.
   *         调用点仍应按 FDCAN 启动之后安排.
   * @note   校验与几何派生全部在修改 self 之前完成, 失败时 self 保持原状.
@@ -67,7 +67,12 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if (!isfinite(config->control_limit) || (config->control_limit < 0.0f))
+    if (config->control_limit > __NERV_MOTOR_CONTROL_LIMIT_MAX)
+    {
+        return NERV_ERROR;
+    }
+
+    if (NERV_OK != NERV_Motor_ValidateModel(config->driver->model))
     {
         return NERV_ERROR;
     }
@@ -134,6 +139,8 @@ NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float 
   * @retval NERV_ERROR self 为 NULL 或实例未初始化.
   * @note   监督结果写入错误位, 不通过返回值报告. 错误位为粘滞, 只由
   *         NERV_Motor_ClearError 清除.
+  * @note   NERV_Motor_ConvertFb 失败分支为防御性保留: 已初始化实例的输入恒有效,
+  *         该分支实际不可达. 若未来引入会失败的换算校验, 失败时本周期不执行监督.
   * @note   指令发送由 NERV_Motor_UpdateGroup 完成.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -166,22 +173,29 @@ NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t 
   * @param  count 数组元素个数, 必须大于 0.
   * @param  now_ms 当前时刻, 单位 ms.
   * @retval NERV_OK 全部指令帧已交给 FDCAN 发送.
-  * @retval NERV_BUSY 没有空闲发送邮箱, 本周期后续帧不再发送, 下周期按当前目标重建.
+  * @retval NERV_BUSY 至少一个组的指令帧在重发后仍因邮箱不可用而失败. 该组全部成员置
+  *         NERV_ERR_MOTOR_TX_FAIL 错误位, 其余组照常发送, 下周期按当前目标重建.
   * @retval NERV_ERROR members 为 NULL, count 为 0, 数组含 NULL 元素, 成员未初始化,
   *         同一总线与指令帧标识符的成员帧长不一致, 同一总线与指令帧标识符内设备 id
-  *         重复, 或编码失败.
+  *         重复, 或编码失败. 发送阶段的编码失败同样置失败组的 TX_FAIL 位.
   * @note   参数与分组一致性错误在刷新与发送之前返回, 不会产生部分发送. 发送阶段的
   *         错误不回滚已处理成员的测量值刷新与已发送的指令帧.
   * @note   分组键为总线实例与指令帧标识符. 同一组每周期只发送一次, 帧内只包含该组
   *         成员的槽位, 其余槽位为 0. 同一指令帧标识符位于不同总线时分别发送.
   * @note   帧长取该组首个成员的值, 同一组的成员必须帧长一致.
-  * @note   同一组内设备 id 必须唯一, 否则两个成员编码到同一槽位互相覆盖.
+  * @note   发送按组独立进行: 某组首轮失败时当场重发一次, 仍失败则置该组 TX_FAIL 错误位
+  *         并继续发送后续组, 返回值汇总为首个失败状态. 单条总线的邮箱压力不会饿死
+  *         其他总线上的组. 发送成功的组自动清除 TX_FAIL 位.
+  * @warning 同一组内设备 id 必须唯一, 否则两个成员编码到同一槽位互相覆盖.
+  * @warning 同一指令帧标识符的电调必须全部纳入同一次调用的 members. 未纳入的槽位
+  *          发 0, 等于给同组其他电调发零指令, 可能清零由其他任务控制的电调.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
   */
 NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                           uint32_t now_ms)
 {
+    NERV_StatusTypeDef overall;
     NERV_StatusTypeDef status;
     uint8_t first;
     uint8_t index;
@@ -213,6 +227,8 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
         }
     }
 
+    overall = NERV_OK;
+
     for (first = 0U; first < count; first++)
     {
         first_of_group = true;
@@ -226,18 +242,35 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
             }
         }
 
-        if (first_of_group)
+        if (!first_of_group)
         {
-            status = NERV_Motor_TransmitGroupFrame(members, count, first);
+            continue;
+        }
 
-            if (NERV_OK != status)
+        status = NERV_Motor_TransmitGroupFrame(members, count, first);
+
+        if (NERV_OK != status)
+        {
+            /* 首轮失败后当场重发一次, 发送邮箱通常在下一拍即可用. */
+            status = NERV_Motor_TransmitGroupFrame(members, count, first);
+        }
+
+        if (NERV_OK == status)
+        {
+            NERV_Motor_ClearGroupTxFail(members, count, first);
+        }
+        else
+        {
+            NERV_Motor_SetGroupTxFail(members, count, first);
+
+            if (NERV_OK == overall)
             {
-                return status;
+                overall = status;
             }
         }
     }
 
-    return NERV_OK;
+    return overall;
 }
 
 /**
@@ -247,7 +280,9 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
   * @note   帧标识符与实例缓存的反馈标识符不一致时忽略该帧. 扩展帧与标准帧的标识符
   *         位宽不同, 即使低位相同也不匹配, 扩展帧一律忽略. 解码失败时丢弃, 不更新
   *         反馈, 不置位 fb_fresh.
-  * @note   只做解码, 存储与置位 fb_fresh, 不读取时钟, 不维护错误位.
+  * @note   只做解码, 存储与置位 fb_fresh, 不读取时钟, 不维护错误位. 解码含浮点
+  *         换算, 在 ISR 上下文中执行, 属于 O(1) 轻量操作; 调用方不得在本函数内追加
+  *         耗时工作, 回调时长直接增加总线接收延迟.
   * @note   ISR-safe.
   */
 void NERV_Motor_OnRx(NERV_Motor_InstanceTypeDef *self, const NERV_FDCAN_FrameTypeDef *frame)
@@ -313,8 +348,9 @@ NERV_StatusTypeDef NERV_Motor_GetMeasurement(const NERV_Motor_InstanceTypeDef *s
 /**
   * @brief  读取电机错误位.
   * @param  self 实例指针, 可以为 NULL.
-  * @return 粘滞错误位掩码. 高 8 位为电机域号, 低 24 位可取 NERV_ERR_MOTOR_OFFLINE
-  *         与 NERV_ERR_MOTOR_OVER_TEMP. self 为 NULL 时返回 NERV_ERR_NONE.
+  * @return 粘滞错误位掩码. 高 8 位为电机域号, 低 24 位可取 NERV_ERR_MOTOR_OFFLINE,
+  *         NERV_ERR_MOTOR_OVER_TEMP 与 NERV_ERR_MOTOR_TX_FAIL. self 为 NULL 时返回
+  *         NERV_ERR_NONE.
   * @note   读取不清除错误位. 错误位只在任务上下文维护, 无需临界区.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -401,7 +437,7 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->fb.temperature_c          = 0;
     self->measurement.angle_rad     = 0.0f;
     self->measurement.speed_radps   = 0.0f;
-    self->measurement.control       = 0.0f;
+    self->measurement.current       = 0.0f;
     self->measurement.temperature_c = 0;
     self->geo.tx_id                 = 0U;
     self->geo.rx_id                 = 0U;
@@ -412,6 +448,69 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->offline_armed             = false;
     self->initialized               = false;
     self->fb_fresh                  = false;
+}
+
+/**
+  * @brief  校验型号描述符内部一致性.
+  * @param  model 型号描述符, 不得为 NULL.
+  * @retval NERV_OK 描述符自洽.
+  * @retval NERV_ERROR 设备 id 范围与分组容量矛盾, 帧长非法, 反馈字段偏移越界,
+  *         角度编码数为 0, 或控制量与反馈量的量程非正或非有限.
+  * @note   描述符由驱动提供. 数据错误时 get_frame_geo 与编解码的行为不可预期
+  *         (设备 id 落到同一槽位互相覆盖, 或反馈字段在帧有效数据外读取), 因此在
+  *         Init 阶段集中拦截, 不把错误描述符带入运行期.
+  * @note   设备 id 范围不得超过两组的槽位总数, 即 id_max 减 id_min 必须小于
+  *         两倍的 motors_per_frame.
+  */
+static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model)
+{
+    if (NULL == model)
+    {
+        return NERV_ERROR;
+    }
+
+    if ((model->id_min < 1U) || (model->id_max < model->id_min) || (model->motors_per_frame < 1U))
+    {
+        return NERV_ERROR;
+    }
+
+    if (((uint32_t)model->id_max - (uint32_t)model->id_min) >=
+        (2U * (uint32_t)model->motors_per_frame))
+    {
+        return NERV_ERROR;
+    }
+
+    if ((model->frame_len < 2U) || (model->frame_len > NERV_FDCAN_DATA_MAX))
+    {
+        return NERV_ERROR;
+    }
+
+    if ((((uint16_t)model->fb_angle_off + 2U) > (uint16_t)model->frame_len) ||
+        (((uint16_t)model->fb_speed_off + 2U) > (uint16_t)model->frame_len) ||
+        (((uint16_t)model->fb_current_off + 2U) > (uint16_t)model->frame_len))
+    {
+        return NERV_ERROR;
+    }
+
+    if ((model->fb_temperature_off != NERV_MOTOR_FB_OFF_NONE) &&
+        (((uint16_t)model->fb_temperature_off + 1U) > (uint16_t)model->frame_len))
+    {
+        return NERV_ERROR;
+    }
+
+    if (0U == model->angle_count)
+    {
+        return NERV_ERROR;
+    }
+
+    if (!isfinite(model->control_full_scale) || (model->control_full_scale <= 0.0f) ||
+        (model->control_cmd_limit <= 0) || !isfinite(model->fb_control_full_scale) ||
+        (model->fb_control_full_scale <= 0.0f) || (model->fb_control_cmd_limit <= 0))
+    {
+        return NERV_ERROR;
+    }
+
+    return NERV_OK;
 }
 
 /**
@@ -450,27 +549,28 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
     measurement->angle_rad =
         NERV_Math_Wrap(fb->angle_rad / config->gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
     measurement->speed_radps   = fb->speed_radps / config->gear_ratio * sign;
-    measurement->control       = fb->current_a * sign;
+    measurement->current       = fb->current_a * sign;
     measurement->temperature_c = fb->temperature_c;
 
     return NERV_OK;
 }
 
 /**
-  * @brief  给出本周期应发送的控制量.
+  * @brief  给出本周期应发送的控制编码.
   * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
-  * @return 乘安装方向符号并按 control_limit 实例限幅后的控制量.
-  * @note   control_limit 为 0 时跳过实例限幅, 协议满量程限幅由驱动完成.
+  * @return 乘安装方向符号并按 control_limit 编码限幅后的控制编码.
+  * @note   control_limit 是控制编码上限, 与型号描述符的 control_cmd_limit 同量纲 (如
+  *         16384, 25000). 控制量与限幅在同一编码空间内直接比较, 不引入物理量换算.
+  * @note   control_limit 为 NERV_DISABLE 时跳过实例限幅, 协议满量程限幅由驱动完成.
   */
 static float NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self)
 {
-    float command;
+    float command = self->target * NERV_Motor_DirectionSign(&self->config);
 
-    command = self->target * NERV_Motor_DirectionSign(&self->config);
-
-    if (self->config.control_limit > 0.0f)
+    if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.control_limit))
     {
-        command = NERV_Math_Clamp(command, -self->config.control_limit, self->config.control_limit);
+        command = NERV_Math_Clamp(command, -(float)self->config.control_limit,
+                                  (float)self->config.control_limit);
     }
 
     return command;
@@ -498,7 +598,9 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
   * @note   fb_fresh 置位时刷新 last_rx_ms 并清除该标志. 首次监督以 now_ms 建立计时
   *         起点, 避免实例初始化后尚未收到反馈就立即判定离线. 之后按无符号回绕减法
   *         计算间隔, 达到 NERV_UTILS_TIMEOUT_MS(offline_ms) 时置离线位. offline_ms
-  *         为 0 时跳过离线判定.
+  *         为 NERV_DISABLE 时跳过离线判定.
+  * @note   now_ms 小于 last_rx_ms (调用方时钟回跳) 时同样重建计时基准, 不用回跳产生
+  *         的巨大无符号差判定离线.
   * @note   过温判定以 over_temperature_c 大于 0 为前提, 读 measurement 的温度字段,
   *         因此本函数必须在 NERV_Motor_ConvertFb 之后调用.
   * @note   错误位为粘滞, 只由 NERV_Motor_ClearError 清除.
@@ -511,18 +613,19 @@ static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_
         self->last_rx_ms    = now_ms;
         self->offline_armed = true;
     }
-    else if (!self->offline_armed)
+    else if ((!self->offline_armed) || (now_ms < self->last_rx_ms))
     {
+        /* 首次监督或调用方时钟回跳时重建计时基准, 不用回跳后的巨大无符号差判定离线. */
         self->last_rx_ms    = now_ms;
         self->offline_armed = true;
     }
-    else if ((self->config.offline_ms > 0U) &&
+    else if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.offline_ms) &&
              ((now_ms - self->last_rx_ms) >= NERV_UTILS_TIMEOUT_MS(self->config.offline_ms)))
     {
         self->error |= (NERV_ERR_MOTOR_OFFLINE & NERV_ERR_BITS_MASK);
     }
 
-    if ((self->config.over_temperature_c > 0.0f) &&
+    if (__NERV_MOTOR_CONFIG_ACTIVE_F(self->config.over_temperature_c) &&
         ((float)self->measurement.temperature_c >= self->config.over_temperature_c))
     {
         self->error |= (NERV_ERR_MOTOR_OVER_TEMP & NERV_ERR_BITS_MASK);
@@ -540,6 +643,48 @@ static bool NERV_Motor_SameGroup(const NERV_Motor_InstanceTypeDef *lhs,
                                  const NERV_Motor_InstanceTypeDef *rhs)
 {
     return (lhs->config.bus == rhs->config.bus) && (lhs->geo.tx_id == rhs->geo.tx_id);
+}
+
+/**
+  * @brief  把指令发送失败标志置位到某组全部成员.
+  * @param  members 实例指针数组, 元素由调用方保证不为 NULL.
+  * @param  count 数组元素个数.
+  * @param  first 该组首个成员在数组中的下标.
+  * @note   同一组的成员共享一条指令帧, 帧发不出去时整组都有责任, 一起置位以便调用方
+  *         经 NERV_Motor_GetError 定位到具体是哪些电机的组发送失败.
+  */
+static void NERV_Motor_SetGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
+                                      uint8_t first)
+{
+    uint8_t index;
+
+    for (index = 0U; index < count; index++)
+    {
+        if (NERV_Motor_SameGroup(members[index], members[first]))
+        {
+            members[index]->error |= (NERV_ERR_MOTOR_TX_FAIL & NERV_ERR_BITS_MASK);
+        }
+    }
+}
+
+/**
+  * @brief  清除某组全部成员的指令发送失败标志.
+  * @param  members 实例指针数组, 元素由调用方保证不为 NULL.
+  * @param  count 数组元素个数.
+  * @param  first 该组首个成员在数组中的下标.
+  */
+static void NERV_Motor_ClearGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
+                                        uint8_t first)
+{
+    uint8_t index;
+
+    for (index = 0U; index < count; index++)
+    {
+        if (NERV_Motor_SameGroup(members[index], members[first]))
+        {
+            members[index]->error &= ~(NERV_ERR_MOTOR_TX_FAIL & NERV_ERR_BITS_MASK);
+        }
+    }
 }
 
 /**

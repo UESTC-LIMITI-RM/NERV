@@ -51,7 +51,7 @@ typedef struct
 
 /**
   * @brief  电机测量值, 机构系.
-  * @note   角度与角速度已按减速比换算到输出轴, 角度, 角速度与控制量按安装方向
+  * @note   角度与角速度已按减速比换算到输出轴, 角度, 角速度与电流按安装方向
   *         取反, 温度原值透传, 正方向为机构正方向.
   * @note   角度范围为 [0, 2π), 不做多圈累积. 需要连续位置时由调用方用 NERV_Math_Wrap
   *         计算增量后自行累积.
@@ -61,7 +61,7 @@ typedef struct NERV_Motor_Measurement
 {
     float angle_rad;      /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 范围 [0, 2π) */
     float speed_radps;    /**< 输出轴角速度, 单位 rad/s, 机构正方向为正 */
-    float control;        /**< 控制量反馈, 单位由型号描述符约定, 机构正方向为正 */
+    float current;        /**< 实际输出电流, 单位 A, 不论电机型号, 机构正方向为正 */
     int8_t temperature_c; /**< 电机温度, 单位 ℃ */
 } NERV_Motor_MeasurementTypeDef;
 
@@ -84,7 +84,7 @@ typedef struct NERV_Motor_Instance
     NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_Update 刷新 */
     uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_GetError 读取 */
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */
-    float target;                              /**< 控制量目标, 由 NERV_Motor_SetTarget 写入 */
+    float target;                              /**< 控制编码目标, 由 NERV_Motor_SetTarget 写入 */
     uint32_t last_rx_ms;                       /**< 最近一次有效反馈的时刻, 单位 ms */
     bool offline_armed;                        /**< 离线监督已建立计时起点, 由模块维护 */
     bool initialized;                          /**< 初始化完成标志, 由 NERV_Motor_Init 置位 */
@@ -99,7 +99,10 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
                                    const NERV_Motor_ConfigTypeDef *config);
 
 /**
-  * @brief  设置电机目标控制量.
+  * @brief  设置电机目标控制编码.
+  * @note   target 为电机控制编码, 量纲同型号描述符的 control_cmd_limit (如 16384, 25000),
+  *         与反馈电流等物理量不在同一单位. 调用方若以物理量配置, 可用
+  *         NERV_Motor_CmdFromPhysical 先换算为控制编码.
   * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
   */
 NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target);

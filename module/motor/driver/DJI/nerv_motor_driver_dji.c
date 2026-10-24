@@ -212,16 +212,14 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
 }
 
 /**
-  * @brief  把控制量编码到控制帧中该电调对应的位置.
+  * @brief  把控制编码编码到控制帧中该电调对应的位置.
   * @param  model 型号描述符, 不得为 NULL.
   * @param  frame 控制帧数据缓冲, 长度不小于 model 的 frame_len, 不得为 NULL.
   * @param  device_id 电调 id, 范围 model 的 id_min 到 id_max.
-  * @param  control 控制量, 单位与语义由型号描述符约定: 电流模式为 A, 电压模式为
-  *                 协议给定值.
+  * @param  control 控制编码, 与型号描述符 control_cmd_limit 同量纲 (如 16384, 25000).
   * @retval NERV_OK 编码成功, frame 中该电调对应位置已写入大端 int16 编码.
   * @retval NERV_ERROR model 或 frame 为 NULL, device_id 越界, 或 control 为非有限值.
-  * @note   编码关系为 control_cmd_limit 对应 control_full_scale.
-  * @note   本函数只按 control_full_scale 限幅到协议满量程. 实例级限幅由电机
+  * @note   本函数只按 control_cmd_limit 把控制编码限幅到协议满量程. 实例级限幅由电机
   *         主逻辑在调用本函数之前完成.
   * @note   ISR-safe.
   */
@@ -243,9 +241,9 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
     }
 
     control_clamped =
-        NERV_Math_Clamp(control, -model->control_full_scale, model->control_full_scale);
+        NERV_Math_Clamp(control, -(float)model->control_cmd_limit, (float)model->control_cmd_limit);
 
-    raw = (int32_t)(control_clamped * (float)model->control_cmd_limit / model->control_full_scale);
+    raw = (int32_t)control_clamped;
 
     offset = (uint8_t)(((uint32_t)(device_id - model->id_min) % (uint32_t)model->motors_per_frame) *
                        (uint32_t)__NERV_MOTOR_DJI_MOTOR_BYTES);

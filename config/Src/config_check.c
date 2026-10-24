@@ -146,8 +146,8 @@ _Static_assert(NERV_ERR_FDCAN_BITS_MASK == 0x000001C0U,
                "NERV_ERR_FDCAN_BITS_MASK must cover bits 6 to 8.");
 _Static_assert(NERV_ERR_MOTOR_BITS_MASK == 0x00100600U,
                "NERV_ERR_MOTOR_BITS_MASK must cover bits 9, 10 and 20.");
-_Static_assert(NERV_ERR_CHASSIS_BITS_MASK == 0x00081800U,
-               "NERV_ERR_CHASSIS_BITS_MASK must cover bits 11, 12 and 19.");
+_Static_assert(NERV_ERR_CHASSIS_BITS_MASK == 0x00001800U,
+               "NERV_ERR_CHASSIS_BITS_MASK must cover bits 11 and 12.");
 _Static_assert(NERV_ERR_GIMBAL_BITS_MASK == 0x00006000U,
                "NERV_ERR_GIMBAL_BITS_MASK must cover bits 13 to 14.");
 _Static_assert(NERV_ERR_SHOOT_BITS_MASK == 0x00018000U,
@@ -162,8 +162,9 @@ _Static_assert(NERV_ERR_SAFETY_BITS_MASK == 0x00060000U,
      NERV_ERR_CHASSIS_BITS_MASK | NERV_ERR_GIMBAL_BITS_MASK | NERV_ERR_SHOOT_BITS_MASK | \
      NERV_ERR_SAFETY_BITS_MASK)
 
-_Static_assert(__NERV_CONFIG_CHECK_ERROR_BITS_MASK == 0x001FFFFFU,
-               "Domain error bits must cover bits 0 to 20 and leave bits 21 to 23 spare.");
+_Static_assert(
+    __NERV_CONFIG_CHECK_ERROR_BITS_MASK == 0x0017FFFFU,
+    "Domain error bits must cover bits 0 to 18 and 20, leaving bits 19, 21 to 23 spare.");
 
 /* 错误码的域号, 位号与位范围必须与定义一致. 位号是低 24 位中的全局位号. */
 

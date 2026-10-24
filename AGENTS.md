@@ -163,7 +163,9 @@ config/       编译期平台选择与功能裁剪
 
 ### 3.4 module
 
-- 只包含 `public/`, `config/` 与 `bsp/Inc/` 的头文件.
+- 只包含 `public/`, `config/`, `bsp/Inc/` 与其他 module 的公开头文件 `module/<name>/Inc/`.
+- 模块间依赖形成子分层: `motor` 是被消费的基础模块, `chassis`, `gimbal`, `shoot` 等上层模块通过其公开接口与实例指针消费它. 依赖方向单向, `motor` 不得包含上层模块头文件, 模块间不得形成环.
+- 不得包含其他 module 的 `*_priv.h` 或 `driver/` 头文件, 跨模块只走公开接口.
 - 不包含任何 MCU 厂商头文件, 不包含 `bsp/<platform>/` 的头文件, 不包含 RTOS 头文件.
 - 通过 BSP 实例指针访问硬件, 不直接调用 HAL 或厂商库.
 - 对外接口使用 SI 单位与 `NERV_StatusTypeDef`.
@@ -453,6 +455,24 @@ float NERV_Utils_RadpsToRpm(float radps);
 - 禁止单字母变量. 不超过 10 行的循环可以使用 `i`.
 - 除 `log` 这类全局服务外, 模块不得使用全局单例.
 - 应用层命名由使用者负责, 不属于本库约束.
+
+### 6.1 术语区分: 偏差与错误
+
+控制语境下两类不同概念使用固定术语, 命名与文档不得混用:
+
+| 概念 | 中文术语 | 英文术语 | 命名示例 |
+| --- | --- | --- | --- |
+| 目标值与实际值之差, 控制的连续输入 | 偏差 | deviation | `speed_deviation_radps`, `translate_prev_deviation` |
+| 系统异常, 需要处置的离散事件 | 错误 | error | `self->error`, `NERV_ERR_MOTOR_OFFLINE`, `NERV_Motor_GetError` |
+
+规则:
+
+- 错误码与错误寄存器体系统一使用 error, 已固化在 `public/Inc/nerv_status.h` 与各模块的 `GetError`, `ClearError` 接口, 不再改动.
+- 控制模块中设定值与测量值之差一律使用 deviation, 不得使用 error, offset (该词专指稳态余差), delta 或 gap.
+- 文档与注释中, 描述控制偏差写"偏差", 描述故障体系写"错误", 两个词不互换.
+- 数值精度问题 (舍入, 浮点容差) 不属于以上两类, 注释写"舍入"或"数值精度".
+- 偏差永不直接进入错误寄存器. 偏差超限且持续构成跟踪故障时, 按离散条件 (阈值加持续时间) 置错误位, 判断依据不是偏差本身.
+- 解算出现非有限值时属错误不属偏差, 必须置错误位并进入安全状态, 不得作为大偏差输入控制环.
 
 ---
 

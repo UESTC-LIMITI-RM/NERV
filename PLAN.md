@@ -98,7 +98,7 @@ RoboMaster 的底盘构型, 云台轴数在同一次编译中只有一个是需�
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM)
 #define NERV_CHASSIS_WHEEL_COUNT  4U
 #elif (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
-#define NERV_CHASSIS_WHEEL_COUNT  3U
+#define NERV_CHASSIS_WHEEL_COUNT  4U
 #else
 #define NERV_CHASSIS_WHEEL_COUNT  4U
 #endif
@@ -267,7 +267,7 @@ module/chassis/Src/nerv_chassis.c
 - [ ] 轮径, 轮距, 减速比, 最大轮速等可调项用 `#ifndef` 包裹并给出范围检查.
 - [ ] 实现麦克纳姆, 全向, 舵轮三种解算, 每次编译只保留选中的一种.
 - [ ] 解算函数不使用运行期函数指针分派, 由 `#if` 直接调用.
-- [ ] 麦克纳姆解算按 X 形排列约定, 符号约定写入头文件契约.
+- [ ] 全向轮解算按 4 轮布局: 轮号 0 到 3 依次为左前, 左后, 右后, 右前, 编号方向为绕底盘一周, 左前起始, 符号约定写入头文件契约.
 - [ ] 里程计先推进角度再更新位置, 角度用 `NERV_Math_Wrap` 归一化到 [-π, π).
 - [ ] 错误位覆盖运动学异常与轮离线.
 - [ ] 严重故障置错误位并通知已注册回调, 故障路径不调用日志宏.
@@ -381,7 +381,7 @@ clang-format --dry-run --Werror public/Inc/nerv_status.h
 ## 7. 待确认的问题
 
 - [ ] 电机型号与协议: 目标电机列表, 电调型号, 帧 ID 分配, 反馈字段比例与量程, 各机型减速比. 减速比等硬件参数由使用者在实例配置中逐台填写, 不设库级默认.
-- [ ] 底盘构型: 麦克纳姆, 全向还是舵轮, 轮数, 轮径, 轮距, 电机布局. 决定 `NERV_CHASSIS_TYPE` 与解算实现.
+- [ ] 底盘构型: 已定为全向轮 (`config.h` 默认 `NERV_CHASSIS_TYPE_OMNI`), 4 轮布局, 轮号 0 到 3 为左前, 左后, 右后, 右前; 轮径, 轮距, 电机布局待定. 决定 `NERV_CHASSIS_WHEEL_COUNT` 与解算实现.
 - [ ] 云台形态: 两轴还是三轴, 限位来源, 是否有双板.
 - [ ] 发射机构形态: 摩擦轮与进弹机构的组合, 卡弹判定依据.
 - [ ] 板间通信: 底盘, 云台, 发射之间的链路拓扑与报文走向.

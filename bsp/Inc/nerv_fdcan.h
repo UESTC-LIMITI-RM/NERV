@@ -297,6 +297,9 @@ static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(const NERV_FDCAN_InstanceTy
   * @note   NOT ISR-safe.
   * @note   注册与替换不得与接收路径并发. NERV_FDCAN_OnRx 分两次读取回调与上下文,
   *         并发替换可能把新回调与旧上下文的组合交给同一次接收.
+  * @note   接收回调在中断上下文执行, 必须保持 O(1) 轻量: 只做拷贝, 置标志或入队,
+  *         不得阻塞, 不得调用可能等待的外设接口, 不得做日志输出. 回调时长直接增加
+  *         总线接收延迟, 可能造成后续帧溢出.
   * @note   回调在平台适配层的接收路径中执行, 可能是中断上下文. 若在中断中调用,
   *         回调实现必须 ISR-safe.
   */

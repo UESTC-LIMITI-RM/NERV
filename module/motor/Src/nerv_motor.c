@@ -100,7 +100,58 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
 }
 
 /**
-  * @brief  设置控制量目标.
+  * @brief  设置多字段控制目标.
+  * @param  self 实例指针, 不得为 NULL.
+  * @param  cmd 控制目标, 不得为 NULL. 按 kind 校验对应分支.
+  * @retval NERV_OK 目标已保存.
+  * @retval NERV_ERROR self 或 cmd 为 NULL, 实例未初始化, kind 不受支持, 或字段非法.
+  * @note   MIT 分支要求 position, velocity, kp, kd, torque 均为有限值, 且 kp, kd 非负.
+  * @note   本函数不限幅. 实例限幅与协议满量程限幅在发送时进行.
+  * @note   NOT ISR-safe.
+  * @note   caller-synchronized.
+  */
+NERV_StatusTypeDef NERV_Motor_SetCmd(NERV_Motor_InstanceTypeDef *self,
+                                     const NERV_Motor_CmdTypeDef *cmd)
+{
+    if ((NULL == self) || (NULL == cmd))
+    {
+        return NERV_ERROR;
+    }
+
+    if (!self->initialized)
+    {
+        return NERV_ERROR;
+    }
+
+    switch (cmd->kind)
+    {
+    case NERV_MOTOR_CMD_SCALAR:
+        if (!isfinite(cmd->u.scalar))
+        {
+            return NERV_ERROR;
+        }
+        break;
+
+    case NERV_MOTOR_CMD_MIT:
+        if (!isfinite(cmd->u.mit.position_rad) || !isfinite(cmd->u.mit.velocity_radps) ||
+            !isfinite(cmd->u.mit.kp) || !isfinite(cmd->u.mit.kd) ||
+            !isfinite(cmd->u.mit.torque_n_m) || (cmd->u.mit.kp < 0.0f) || (cmd->u.mit.kd < 0.0f))
+        {
+            return NERV_ERROR;
+        }
+        break;
+
+    default:
+        return NERV_ERROR;
+    }
+
+    self->target_cmd = *cmd;
+
+    return NERV_OK;
+}
+
+/**
+  * @brief  设置单一控制量目标, 等价于 SCALAR 分支.
   * @param  self 实例指针, 不得为 NULL.
   * @param  target 控制量目标, 单位与语义由型号描述符约定, 必须为有限值.
   * @retval NERV_OK 目标已保存.
@@ -111,24 +162,17 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
   */
 NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target)
 {
-    if (NULL == self)
+    NERV_Motor_CmdTypeDef cmd;
+
+    if ((NULL == self) || !isfinite(target))
     {
         return NERV_ERROR;
     }
 
-    if (!self->initialized)
-    {
-        return NERV_ERROR;
-    }
+    cmd.kind     = NERV_MOTOR_CMD_SCALAR;
+    cmd.u.scalar = target;
 
-    if (!isfinite(target))
-    {
-        return NERV_ERROR;
-    }
-
-    self->target = target;
-
-    return NERV_OK;
+    return NERV_Motor_SetCmd(self, &cmd);
 }
 
 /**
@@ -419,8 +463,9 @@ NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    self->target        = 0.0f;
-    self->offline_armed = false;
+    self->target_cmd.kind     = NERV_MOTOR_CMD_SCALAR;
+    self->target_cmd.u.scalar = 0.0f;
+    self->offline_armed       = false;
 
     return NERV_OK;
 }
@@ -443,7 +488,8 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->geo.rx_id                 = 0U;
     self->geo.len                   = 0U;
     self->error                     = 0U;
-    self->target                    = 0.0f;
+    self->target_cmd.kind           = NERV_MOTOR_CMD_SCALAR;
+    self->target_cmd.u.scalar       = 0.0f;
     self->last_rx_ms                = 0U;
     self->offline_armed             = false;
     self->initialized               = false;
@@ -556,24 +602,48 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
 }
 
 /**
-  * @brief  给出本周期应发送的控制编码.
+  * @brief  给出本周期应发送的控制目标.
   * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
-  * @return 乘安装方向符号并按 control_limit 编码限幅后的控制编码.
-  * @note   control_limit 是控制编码上限, 与型号描述符的 control_cmd_limit 同量纲 (如
-  *         16384, 25000). 控制量与限幅在同一编码空间内直接比较, 不引入物理量换算.
+  * @return 已按安装方向取反并按 control_limit 限幅的控制目标.
+  * @note   方向取反只作用于物理量分支: SCALAR 的 scalar, MIT 的 position,
+  *         velocity 与 torque, VELOCITY 的 velocity_radps; kp 与 kd 不取反.
+  * @note   control_limit 只约束 SCALAR 分支的编码, 与型号描述符的 control_cmd_limit
+  *         同量纲 (如 16384, 25000). MIT 的范围由描述符的 p_max, v_max, t_max 约束.
   * @note   control_limit 为 NERV_DISABLE 时跳过实例限幅, 协议满量程限幅由驱动完成.
   */
-static float NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self)
+static NERV_Motor_CmdTypeDef NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self)
 {
-    float command = self->target * NERV_Motor_DirectionSign(&self->config);
+    NERV_Motor_CmdTypeDef cmd;
+    float sign;
 
-    if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.control_limit))
+    cmd  = self->target_cmd;
+    sign = NERV_Motor_DirectionSign(&self->config);
+
+    switch (cmd.kind)
     {
-        command = NERV_Math_Clamp(command, -(float)self->config.control_limit,
-                                  (float)self->config.control_limit);
+    case NERV_MOTOR_CMD_SCALAR:
+        cmd.u.scalar *= sign;
+
+        if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.control_limit))
+        {
+            cmd.u.scalar = NERV_Math_Clamp(cmd.u.scalar, -(float)self->config.control_limit,
+                                           (float)self->config.control_limit);
+        }
+        break;
+
+    case NERV_MOTOR_CMD_MIT:
+        cmd.u.mit.position_rad *= sign;
+        cmd.u.mit.velocity_radps *= sign;
+        cmd.u.mit.torque_n_m *= sign;
+        break;
+
+    default:
+        cmd.kind     = NERV_MOTOR_CMD_SCALAR;
+        cmd.u.scalar = 0.0f;
+        break;
     }
 
-    return command;
+    return cmd;
 }
 
 /**
@@ -586,9 +656,12 @@ static float NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self)
 static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
                                                 uint8_t *frame)
 {
+    NERV_Motor_CmdTypeDef cmd;
+
+    cmd = NERV_Motor_EffectiveCommand(self);
+
     return self->config.driver->ops->encode_tx(self->config.driver->model, frame,
-                                               self->config.device_id,
-                                               NERV_Motor_EffectiveCommand(self));
+                                               self->config.device_id, &cmd);
 }
 
 /**

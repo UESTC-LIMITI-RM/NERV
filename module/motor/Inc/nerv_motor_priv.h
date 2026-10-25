@@ -60,7 +60,7 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
                                                const NERV_Motor_FbTypeDef *fb,
                                                NERV_Motor_MeasurementTypeDef *measurement);
 
-static float NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self);
+static NERV_Motor_CmdTypeDef NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self);
 
 static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
                                                 uint8_t *frame);

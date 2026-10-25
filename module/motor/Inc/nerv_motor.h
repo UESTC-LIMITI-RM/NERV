@@ -84,7 +84,7 @@ typedef struct NERV_Motor_Instance
     NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_Update 刷新 */
     uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_GetError 读取 */
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */
-    float target;                              /**< 控制编码目标, 由 NERV_Motor_SetTarget 写入 */
+    NERV_Motor_CmdTypeDef target_cmd;          /**< 控制目标, 由 SetTarget 或 SetCmd 写入 */
     uint32_t last_rx_ms;                       /**< 最近一次有效反馈的时刻, 单位 ms */
     bool offline_armed;                        /**< 离线监督已建立计时起点, 由模块维护 */
     bool initialized;                          /**< 初始化完成标志, 由 NERV_Motor_Init 置位 */
@@ -106,6 +106,15 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
   * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
   */
 NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target);
+
+/**
+  * @brief  设置电机控制目标（多字段）.
+  * @note   cmd 按 kind 选择有效分支, 各驱动只支持自己协议的分支, 不支持时发送返回
+  *         NERV_ERROR. 只有单一控制量的简单协议可继续用 NERV_Motor_SetTarget.
+  * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
+  */
+NERV_StatusTypeDef NERV_Motor_SetCmd(NERV_Motor_InstanceTypeDef *self,
+                                     const NERV_Motor_CmdTypeDef *cmd);
 
 /**
   * @brief  刷新测量值, 运行在线监督并积分离线计时.

@@ -224,13 +224,16 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
   * @note   ISR-safe.
   */
 static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef *model,
-                                                  uint8_t *frame, uint8_t device_id, float control)
+                                                  uint8_t *frame, uint8_t device_id,
+                                                  const NERV_Motor_CmdTypeDef *cmd)
 {
+    float control;
     float control_clamped;
     int32_t raw;
     uint8_t offset;
 
-    if ((NULL == model) || (NULL == frame) || !isfinite(control))
+    if ((NULL == model) || (NULL == frame) || (NULL == cmd) ||
+        (cmd->kind != NERV_MOTOR_CMD_SCALAR) || !isfinite(cmd->u.scalar))
     {
         return NERV_ERROR;
     }
@@ -239,6 +242,8 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
     {
         return NERV_ERROR;
     }
+
+    control = cmd->u.scalar;
 
     control_clamped =
         NERV_Math_Clamp(control, -(float)model->control_cmd_limit, (float)model->control_cmd_limit);
@@ -308,6 +313,10 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
     {
         fb->temperature_c = (int8_t)frame[model->fb_temperature_off];
     }
+
+    fb->torque_n_m        = 0.0f;
+    fb->temperature_mos_c = INT8_MIN;
+    fb->error_code        = 0U;
 
     return NERV_OK;
 }

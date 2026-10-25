@@ -186,6 +186,47 @@
 #error "NERV_USE_CHASSIS_ODOMETRY must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
+/* 底盘前馈功能裁剪开关. */
+
+#ifndef NERV_CHASSIS_USE_SLOPE_FEEDFORWARD
+/**
+ * @brief 上坡重力前馈开关.
+ * @note  取 NERV_ENABLE 或 NERV_DISABLE. 关闭时 NERV_Chassis_SetSlopeFeedforward
+ *        不参与编译, 速度环不叠加上坡前馈.
+ */
+#define NERV_CHASSIS_USE_SLOPE_FEEDFORWARD NERV_ENABLE
+#endif
+
+#if (NERV_CHASSIS_USE_SLOPE_FEEDFORWARD != NERV_ENABLE) && \
+    (NERV_CHASSIS_USE_SLOPE_FEEDFORWARD != NERV_DISABLE)
+#error "NERV_CHASSIS_USE_SLOPE_FEEDFORWARD must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#ifndef NERV_CHASSIS_USE_DRAG_FEEDFORWARD
+/**
+ * @brief 阻力前馈开关.
+ * @note  取 NERV_ENABLE 或 NERV_DISABLE. 关闭时 Update 不叠加阻力前馈电流.
+ */
+#define NERV_CHASSIS_USE_DRAG_FEEDFORWARD NERV_ENABLE
+#endif
+
+#if (NERV_CHASSIS_USE_DRAG_FEEDFORWARD != NERV_ENABLE) && \
+    (NERV_CHASSIS_USE_DRAG_FEEDFORWARD != NERV_DISABLE)
+#error "NERV_CHASSIS_USE_DRAG_FEEDFORWARD must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#ifndef NERV_CHASSIS_USE_POWER_LIMIT
+/**
+ * @brief 功率限制开关.
+ * @note  取 NERV_ENABLE 或 NERV_DISABLE. 关闭时 Update 不做功率衰减.
+ */
+#define NERV_CHASSIS_USE_POWER_LIMIT NERV_ENABLE
+#endif
+
+#if (NERV_CHASSIS_USE_POWER_LIMIT != NERV_ENABLE) && (NERV_CHASSIS_USE_POWER_LIMIT != NERV_DISABLE)
+#error "NERV_CHASSIS_USE_POWER_LIMIT must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
 /* 底盘构型. 同一次编译只能选择一种. */
 
 /**

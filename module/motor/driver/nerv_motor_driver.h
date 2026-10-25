@@ -34,8 +34,48 @@ typedef struct NERV_Motor_Fb
     float angle_rad;      /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
     float speed_radps;    /**< 转子转速, 单位 rad/s, 逆时针为正. */
     float current_a;      /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. */
+    float torque_n_m;     /**< 转子输出转矩, 单位 N·m, 型号不上报时置 0. */
     int8_t temperature_c; /**< 电机温度, 单位 ℃. 由电调上报, 可用性取决于温度传感器与电调固件. */
+    int8_t temperature_mos_c; /**< 驱动器 MOS 温度, 单位 ℃, 型号不上报时置 INT8_MIN. */
+    uint8_t error_code;       /**< 驱动器故障码原值, 型号不上报时置 0. */
 } NERV_Motor_FbTypeDef;
+
+/**
+  * @brief  控制量种类.
+  * @note   与 NERV_Motor_CmdTypeDef 的联合体成员一一对应, 驱动按本值选择解码分支.
+  */
+typedef enum
+{
+    NERV_MOTOR_CMD_SCALAR = 0U, /**< 单一控制量, 单位由型号描述符约定 (如电流, 电压或速度) */
+    NERV_MOTOR_CMD_MIT,         /**< MIT 模式, 位置/速度/刚度/阻尼/前馈转矩 */
+} NERV_Motor_CmdKindTypeDef;
+
+/**
+  * @brief  电机控制目标.
+  * @note   联合体只保留一份有效成员, 由 kind 标识. 各驱动只读取自己支持的分支,
+  *         kind 不受支持时返回 NERV_ERROR.
+  * @note   SCALAR 分支用于只接受单一控制量的协议, 物理量由型号描述符的
+  *         control_full_scale 约定, 例如 M3508 是电流, 6020 电压版是电压;
+  *         MIT 分支用于达妙等支持位置, 速度, 刚度, 阻尼与前馈转矩的协议.
+  * @note   MIT 的 position_rad 与 velocity_radps 为转子量, kp 与 kd 为协议约定单位,
+  *         torque_n_m 为前馈转矩, 单位 N·m.
+  */
+typedef struct
+{
+    NERV_Motor_CmdKindTypeDef kind; /**< 有效分支标识 */
+    union
+    {
+        float scalar; /**< SCALAR 分支, 单位由型号描述符 control_full_scale 约定 */
+        struct
+        {
+            float position_rad;   /**< 目标位置, 单位 rad */
+            float velocity_radps; /**< 目标速度, 单位 rad/s */
+            float kp;             /**< 位置刚度, 单位由协议约定 */
+            float kd;             /**< 速度阻尼, 单位由协议约定 */
+            float torque_n_m;     /**< 前馈转矩, 单位 N·m */
+        } mit;
+    } u;
+} NERV_Motor_CmdTypeDef;
 
 /**
   * @brief  描述符中表示反馈帧无此字段的偏移值.
@@ -115,7 +155,7 @@ typedef struct
     NERV_StatusTypeDef (*get_frame_geo)(const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
                                         NERV_Motor_FrameGeoTypeDef *geo);
     NERV_StatusTypeDef (*encode_tx)(const NERV_Motor_ModelTypeDef *model, uint8_t *frame,
-                                    uint8_t device_id, float control);
+                                    uint8_t device_id, const NERV_Motor_CmdTypeDef *cmd);
     NERV_StatusTypeDef (*decode_fb)(const NERV_Motor_ModelTypeDef *model, const uint8_t *frame,
                                     uint8_t len, NERV_Motor_FbTypeDef *fb);
 } NERV_Motor_Driver_OpsTypeDef;

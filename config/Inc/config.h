@@ -179,7 +179,7 @@
   * @note  关闭时实例不含里程计字段, Update 不积分位置, NERV_Chassis_GetOdometry 与
   *         NERV_Chassis_SetOdometry 不参与编译.
   */
-#define NERV_USE_CHASSIS_ODOMETRY NERV_ENABLE
+#define NERV_USE_CHASSIS_ODOMETRY NERV_DISABLE
 #endif
 
 #if (NERV_USE_CHASSIS_ODOMETRY != NERV_ENABLE) && (NERV_USE_CHASSIS_ODOMETRY != NERV_DISABLE)

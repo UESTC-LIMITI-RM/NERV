@@ -18,6 +18,7 @@
 
 #if (NERV_USE_MOTOR == NERV_ENABLE)
 
+#include "nerv_fdcan.h"
 #include "nerv_status.h"
 
 #ifdef __cplusplus
@@ -265,6 +266,28 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmVelocity;
   * @note  控制帧标识符为 0x100 加设备 id, 控制量为 NERV_MOTOR_CMD_POSITION_VELOCITY.
   */
 extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity;
+
+/** @brief 达妙特殊命令码, 占用 8 字节帧的最后一字节, 前 7 字节为 0xFF. */
+#define NERV_MOTOR_DM_CMD_CLEAR_ERROR 0xFBU /**< 清除故障 */
+#define NERV_MOTOR_DM_CMD_ENABLE      0xFCU /**< 使能电机 */
+#define NERV_MOTOR_DM_CMD_DISABLE     0xFDU /**< 失能电机 */
+#define NERV_MOTOR_DM_CMD_SAVE_ZERO   0xFEU /**< 当前位置保存为零点 */
+
+/**
+  * @brief  发送达妙特殊命令帧.
+  * @param  bus 电机所在总线, 不得为 NULL.
+  * @param  model 型号描述符, 不得为 NULL.
+  * @param  device_id 电机 CAN ID, 范围 model 的 id_min 到 id_max.
+  * @param  command 命令码, 取 NERV_MOTOR_DM_CMD_*.
+  * @retval NERV_OK 帧已交给总线.
+  * @retval NERV_ERROR 参数为 NULL, 设备 id 越界, 或总线发送失败.
+  * @note   命令帧的 CAN ID 等于当前控制模式的控制帧 ID, 数据为 7 字节 0xFF 加命令码.
+  * @note   电机必须使能后才能执行控制帧; 掉线后需要重新使能.
+  * @note   NOT ISR-safe. 经平台适配层发送.
+  */
+NERV_StatusTypeDef NERV_Motor_Dm_SendCommand(const NERV_FDCAN_InstanceTypeDef *bus,
+                                             const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
+                                             uint8_t command);
 
 #endif /* NERV_USE_MOTOR_DM */
 

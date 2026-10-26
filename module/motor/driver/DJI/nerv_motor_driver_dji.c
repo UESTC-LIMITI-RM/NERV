@@ -50,22 +50,22 @@
   * @note   数值依据 RoboMaster C620 无刷电机调速器使用说明 V1.01.
   */
 static const NERV_Motor_ModelTypeDef dji_model_3508 = {
-    .tx_id_low             = 0x200U,
-    .tx_id_high            = 0x1FFU,
-    .rx_id_base            = 0x200U,
-    .id_min                = 1U,
-    .id_max                = 8U,
-    .motors_per_frame      = 4U,
-    .frame_len             = 8U,
-    .fb_angle_off          = 0U,
-    .fb_speed_off          = 2U,
-    .fb_current_off        = 4U,
-    .fb_temperature_off    = 6U,
-    .angle_count           = 8192U,
-    .control_full_scale    = 20.0f,
-    .control_cmd_limit     = 16384,
-    .fb_control_full_scale = 20.0f,
-    .fb_control_cmd_limit  = 16384,
+    .tx_id_low                 = 0x200U,
+    .tx_id_high                = 0x1FFU,
+    .rx_id_base                = 0x200U,
+    .id_min                    = 1U,
+    .id_max                    = 8U,
+    .motors_per_frame          = 4U,
+    .frame_len                 = 8U,
+    .fb_angle_off              = 0U,
+    .fb_speed_off              = 2U,
+    .fb_current_off            = 4U,
+    .fb_temperature_off        = 6U,
+    .angle_count               = 8192U,
+    .control.scalar.full_scale = 20.0f,
+    .control.scalar.cmd_limit  = 16384,
+    .fb_control_full_scale     = 20.0f,
+    .fb_control_cmd_limit      = 16384,
 };
 
 /**
@@ -76,22 +76,22 @@ static const NERV_Motor_ModelTypeDef dji_model_3508 = {
   *         解码后 temperature_c 为 INT8_MIN.
   */
 static const NERV_Motor_ModelTypeDef dji_model_2006 = {
-    .tx_id_low             = 0x200U,
-    .tx_id_high            = 0x1FFU,
-    .rx_id_base            = 0x200U,
-    .id_min                = 1U,
-    .id_max                = 8U,
-    .motors_per_frame      = 4U,
-    .frame_len             = 8U,
-    .fb_angle_off          = 0U,
-    .fb_speed_off          = 2U,
-    .fb_current_off        = 4U,
-    .fb_temperature_off    = NERV_MOTOR_FB_OFF_NONE,
-    .angle_count           = 8192U,
-    .control_full_scale    = 10.0f,
-    .control_cmd_limit     = 10000,
-    .fb_control_full_scale = 10.0f,
-    .fb_control_cmd_limit  = 10000,
+    .tx_id_low                 = 0x200U,
+    .tx_id_high                = 0x1FFU,
+    .rx_id_base                = 0x200U,
+    .id_min                    = 1U,
+    .id_max                    = 8U,
+    .motors_per_frame          = 4U,
+    .frame_len                 = 8U,
+    .fb_angle_off              = 0U,
+    .fb_speed_off              = 2U,
+    .fb_current_off            = 4U,
+    .fb_temperature_off        = NERV_MOTOR_FB_OFF_NONE,
+    .angle_count               = 8192U,
+    .control.scalar.full_scale = 10.0f,
+    .control.scalar.cmd_limit  = 10000,
+    .fb_control_full_scale     = 10.0f,
+    .fb_control_cmd_limit      = 10000,
 };
 
 /**
@@ -102,22 +102,22 @@ static const NERV_Motor_ModelTypeDef dji_model_2006 = {
   *         反馈中的控制量字段为实际输出电流, 编码相同.
   */
 static const NERV_Motor_ModelTypeDef dji_model_6020_current = {
-    .tx_id_low             = 0x1FEU,
-    .tx_id_high            = 0x2FEU,
-    .rx_id_base            = 0x204U,
-    .id_min                = 1U,
-    .id_max                = 7U,
-    .motors_per_frame      = 4U,
-    .frame_len             = 8U,
-    .fb_angle_off          = 0U,
-    .fb_speed_off          = 2U,
-    .fb_current_off        = 4U,
-    .fb_temperature_off    = 6U,
-    .angle_count           = 8192U,
-    .control_full_scale    = 3.0f,
-    .control_cmd_limit     = 16384,
-    .fb_control_full_scale = 3.0f,
-    .fb_control_cmd_limit  = 16384,
+    .tx_id_low                 = 0x1FEU,
+    .tx_id_high                = 0x2FEU,
+    .rx_id_base                = 0x204U,
+    .id_min                    = 1U,
+    .id_max                    = 7U,
+    .motors_per_frame          = 4U,
+    .frame_len                 = 8U,
+    .fb_angle_off              = 0U,
+    .fb_speed_off              = 2U,
+    .fb_current_off            = 4U,
+    .fb_temperature_off        = 6U,
+    .angle_count               = 8192U,
+    .control.scalar.full_scale = 3.0f,
+    .control.scalar.cmd_limit  = 16384,
+    .fb_control_full_scale     = 3.0f,
+    .fb_control_cmd_limit      = 16384,
 };
 
 /**
@@ -129,22 +129,22 @@ static const NERV_Motor_ModelTypeDef dji_model_6020_current = {
   *         仍是实际输出电流, 编码与电流模式相同, 与指令编码不同.
   */
 static const NERV_Motor_ModelTypeDef dji_model_6020_voltage = {
-    .tx_id_low             = 0x1FFU,
-    .tx_id_high            = 0x2FFU,
-    .rx_id_base            = 0x204U,
-    .id_min                = 1U,
-    .id_max                = 7U,
-    .motors_per_frame      = 4U,
-    .frame_len             = 8U,
-    .fb_angle_off          = 0U,
-    .fb_speed_off          = 2U,
-    .fb_current_off        = 4U,
-    .fb_temperature_off    = 6U,
-    .angle_count           = 8192U,
-    .control_full_scale    = 25000.0f,
-    .control_cmd_limit     = 25000,
-    .fb_control_full_scale = 3.0f,
-    .fb_control_cmd_limit  = 16384,
+    .tx_id_low                 = 0x1FFU,
+    .tx_id_high                = 0x2FFU,
+    .rx_id_base                = 0x204U,
+    .id_min                    = 1U,
+    .id_max                    = 7U,
+    .motors_per_frame          = 4U,
+    .frame_len                 = 8U,
+    .fb_angle_off              = 0U,
+    .fb_speed_off              = 2U,
+    .fb_current_off            = 4U,
+    .fb_temperature_off        = 6U,
+    .angle_count               = 8192U,
+    .control.scalar.full_scale = 25000.0f,
+    .control.scalar.cmd_limit  = 25000,
+    .fb_control_full_scale     = 3.0f,
+    .fb_control_cmd_limit      = 16384,
 };
 
 /**
@@ -216,10 +216,10 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
   * @param  model 型号描述符, 不得为 NULL.
   * @param  frame 控制帧数据缓冲, 长度不小于 model 的 frame_len, 不得为 NULL.
   * @param  device_id 电调 id, 范围 model 的 id_min 到 id_max.
-  * @param  control 控制编码, 与型号描述符 control_cmd_limit 同量纲 (如 16384, 25000).
+  * @param  control 控制编码, 与型号描述符 control.scalar.cmd_limit 同量纲 (如 16384, 25000).
   * @retval NERV_OK 编码成功, frame 中该电调对应位置已写入大端 int16 编码.
   * @retval NERV_ERROR model 或 frame 为 NULL, device_id 越界, 或 control 为非有限值.
-  * @note   本函数只按 control_cmd_limit 把控制编码限幅到协议满量程. 实例级限幅由电机
+  * @note   本函数只按 control.scalar.cmd_limit 把控制编码限幅到协议满量程. 实例级限幅由电机
   *         主逻辑在调用本函数之前完成.
   * @note   ISR-safe.
   */
@@ -245,8 +245,8 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
 
     control = cmd->u.scalar;
 
-    control_clamped =
-        NERV_Math_Clamp(control, -(float)model->control_cmd_limit, (float)model->control_cmd_limit);
+    control_clamped = NERV_Math_Clamp(control, -(float)model->control.scalar.cmd_limit,
+                                      (float)model->control.scalar.cmd_limit);
 
     raw = (int32_t)control_clamped;
 

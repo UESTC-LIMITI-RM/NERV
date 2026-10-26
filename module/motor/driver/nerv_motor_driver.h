@@ -11,6 +11,7 @@
 #ifndef NERV_MOTOR_DRIVER_H
 #define NERV_MOTOR_DRIVER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "config.h"
@@ -46,8 +47,9 @@ typedef struct NERV_Motor_Fb
   */
 typedef enum
 {
-    NERV_MOTOR_CMD_SCALAR = 0U, /**< 单一控制量, 单位由型号描述符约定 (如电流, 电压或速度) */
-    NERV_MOTOR_CMD_MIT,         /**< MIT 模式, 位置/速度/刚度/阻尼/前馈转矩 */
+    NERV_MOTOR_CMD_SCALAR = 0U,       /**< 单一控制量, 单位由型号描述符约定 (如电流, 电压或速度) */
+    NERV_MOTOR_CMD_MIT,               /**< MIT 模式, 位置/速度/刚度/阻尼/前馈转矩 */
+    NERV_MOTOR_CMD_POSITION_VELOCITY, /**< 位置速度模式, 目标位置与限速 */
 } NERV_Motor_CmdKindTypeDef;
 
 /**
@@ -74,6 +76,11 @@ typedef struct
             float kd;             /**< 速度阻尼, 单位由协议约定 */
             float torque_n_m;     /**< 前馈转矩, 单位 N·m */
         } mit;
+        struct
+        {
+            float position_rad;   /**< 目标位置, 单位 rad */
+            float velocity_radps; /**< 限速, 单位 rad/s */
+        } position_velocity;
     } u;
 } NERV_Motor_CmdTypeDef;
 
@@ -107,21 +114,43 @@ typedef struct
     uint8_t fb_current_off;       /**< 反馈帧实际输出电流字段偏移, int16 大端 */
     uint8_t fb_temperature_off;   /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
     uint16_t angle_count;         /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
-    float control_full_scale;     /**< 控制指令满量程, 单位由协议族约定, 编码满量程对应本值 */
-    int16_t control_cmd_limit;    /**< 控制指令编码满量程 */
     float fb_control_full_scale;  /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
     int16_t fb_control_cmd_limit; /**< 反馈中控制量字段的编码满量程 */
+    bool fb_bit_packed;           /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
+    bool
+        tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id 偏移, false 表示按低组/高组选帧 */
+    bool
+        rx_id_offset_by_device; /**< true 表示反馈帧标识符等于 rx_id_base 加设备 id, false 表示固定为 rx_id_base */
+    uint8_t
+        control_mode; /**< 控制模式, 取 NERV_Motor_CmdKindTypeDef, 决定 control 联合体的有效成员 */
+    union
+    {
+        struct
+        {
+            float full_scale;  /**< 单一控制量满量程, 单位由协议族约定 */
+            int16_t cmd_limit; /**< 单一控制量编码满量程 */
+        } scalar;
+        struct
+        {
+            float p_max_rad;   /**< 位置满量程, 单位 rad */
+            float v_max_radps; /**< 速度满量程, 单位 rad/s */
+            float t_max_n_m;   /**< 转矩满量程, 单位 N·m */
+            float kp_max;      /**< 位置刚度满量程 */
+            float kd_max;      /**< 速度阻尼满量程 */
+        } profile;
+    } control;
 } NERV_Motor_ModelTypeDef;
 
 /**
   * @brief  把控制量物理量换算为电机控制编码.
-  * @note   线性比例 control_cmd_limit / control_full_scale. 物理量的单位必须与型号描述符
-  *         control_full_scale 一致 (电流模式为 A, 电压模式为协议给定值). 结果为有符号控制
-  *         编码, 范围约 ±control_cmd_limit. 调用方可借此把物理量目标转换为控制编码后传给
-  *         NERV_Motor_SetTarget, 从而以物理量配置, 由电机层以控制编码下发.
+  * @note   线性比例 control.scalar.cmd_limit / control.scalar.full_scale. 物理量的单位
+  *         必须与 control.scalar.full_scale 一致 (电流模式为 A, 电压模式为协议给定值).
+  *         结果为有符号控制编码, 范围约 ±control.scalar.cmd_limit. 只适用于 SCALAR 控制
+  *         模式, 多字段模式由驱动自行换算.
   */
-#define NERV_Motor_CmdFromPhysical(_model, _physical) \
-    ((float)(_physical) * (float)(_model)->control_cmd_limit / (_model)->control_full_scale)
+#define NERV_Motor_CmdFromPhysical(_model, _physical)                 \
+    ((float)(_physical) * (float)(_model)->control.scalar.cmd_limit / \
+     (_model)->control.scalar.full_scale)
 
 /**
   * @brief  电机帧几何信息.
@@ -212,6 +241,32 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current;
 extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage;
 
 #endif /* NERV_USE_MOTOR_DJI */
+
+#if (NERV_USE_MOTOR_DM == NERV_ENABLE)
+
+/**
+  * @brief 达妙 DM-J4310-2EC MIT 模式驱动.
+  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
+  * @note  控制帧标识符为 0x000 加设备 id, 反馈帧标识符由 Master ID 配置.
+  * @note  控制量为 NERV_MOTOR_CMD_MIT, 位置/速度/刚度/阻尼/前馈转矩位打包进 8 字节.
+  */
+extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmMit;
+
+/**
+  * @brief 达妙 DM-J4310-2EC 速度模式驱动.
+  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
+  * @note  控制帧标识符为 0x200 加设备 id, 控制量为 NERV_MOTOR_CMD_SCALAR, 单位 rad/s.
+  */
+extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmVelocity;
+
+/**
+  * @brief 达妙 DM-J4310-2EC 位置速度模式驱动.
+  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
+  * @note  控制帧标识符为 0x100 加设备 id, 控制量为 NERV_MOTOR_CMD_POSITION_VELOCITY.
+  */
+extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity;
+
+#endif /* NERV_USE_MOTOR_DM */
 
 #ifdef __cplusplus
 }

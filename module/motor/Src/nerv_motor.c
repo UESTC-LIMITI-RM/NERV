@@ -132,6 +132,14 @@ NERV_StatusTypeDef NERV_Motor_SetCmd(NERV_Motor_InstanceTypeDef *self,
         }
         break;
 
+    case NERV_MOTOR_CMD_POSITION_VELOCITY:
+        if (!isfinite(cmd->u.position_velocity.position_rad) ||
+            !isfinite(cmd->u.position_velocity.velocity_radps))
+        {
+            return NERV_ERROR;
+        }
+        break;
+
     case NERV_MOTOR_CMD_MIT:
         if (!isfinite(cmd->u.mit.position_rad) || !isfinite(cmd->u.mit.velocity_radps) ||
             !isfinite(cmd->u.mit.kp) || !isfinite(cmd->u.mit.kd) ||
@@ -520,8 +528,8 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         return NERV_ERROR;
     }
 
-    if (((uint32_t)model->id_max - (uint32_t)model->id_min) >=
-        (2U * (uint32_t)model->motors_per_frame))
+    if ((!model->tx_id_offset_by_device) && (((uint32_t)model->id_max - (uint32_t)model->id_min) >=
+                                             (2U * (uint32_t)model->motors_per_frame)))
     {
         return NERV_ERROR;
     }
@@ -531,17 +539,20 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         return NERV_ERROR;
     }
 
-    if ((((uint16_t)model->fb_angle_off + 2U) > (uint16_t)model->frame_len) ||
-        (((uint16_t)model->fb_speed_off + 2U) > (uint16_t)model->frame_len) ||
-        (((uint16_t)model->fb_current_off + 2U) > (uint16_t)model->frame_len))
+    if (!model->fb_bit_packed)
     {
-        return NERV_ERROR;
-    }
+        if ((((uint16_t)model->fb_angle_off + 2U) > (uint16_t)model->frame_len) ||
+            (((uint16_t)model->fb_speed_off + 2U) > (uint16_t)model->frame_len) ||
+            (((uint16_t)model->fb_current_off + 2U) > (uint16_t)model->frame_len))
+        {
+            return NERV_ERROR;
+        }
 
-    if ((model->fb_temperature_off != NERV_MOTOR_FB_OFF_NONE) &&
-        (((uint16_t)model->fb_temperature_off + 1U) > (uint16_t)model->frame_len))
-    {
-        return NERV_ERROR;
+        if ((model->fb_temperature_off != NERV_MOTOR_FB_OFF_NONE) &&
+            (((uint16_t)model->fb_temperature_off + 1U) > (uint16_t)model->frame_len))
+        {
+            return NERV_ERROR;
+        }
     }
 
     if (0U == model->angle_count)
@@ -549,11 +560,48 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         return NERV_ERROR;
     }
 
-    if (!isfinite(model->control_full_scale) || (model->control_full_scale <= 0.0f) ||
-        (model->control_cmd_limit <= 0) || !isfinite(model->fb_control_full_scale) ||
-        (model->fb_control_full_scale <= 0.0f) || (model->fb_control_cmd_limit <= 0))
+    if (!model->fb_bit_packed)
+    {
+        if (!isfinite(model->fb_control_full_scale) || (model->fb_control_full_scale <= 0.0f) ||
+            (model->fb_control_cmd_limit <= 0))
+        {
+            return NERV_ERROR;
+        }
+    }
+
+    if (model->control_mode > (uint8_t)NERV_MOTOR_CMD_POSITION_VELOCITY)
     {
         return NERV_ERROR;
+    }
+
+    if (NERV_MOTOR_CMD_SCALAR == (NERV_Motor_CmdKindTypeDef)model->control_mode)
+    {
+        if (!isfinite(model->control.scalar.full_scale) ||
+            (model->control.scalar.full_scale <= 0.0f) || (model->control.scalar.cmd_limit <= 0))
+        {
+            return NERV_ERROR;
+        }
+    }
+    else
+    {
+        if (!isfinite(model->control.profile.p_max_rad) ||
+            (model->control.profile.p_max_rad <= 0.0f) ||
+            !isfinite(model->control.profile.v_max_radps) ||
+            (model->control.profile.v_max_radps <= 0.0f))
+        {
+            return NERV_ERROR;
+        }
+    }
+
+    if (NERV_MOTOR_CMD_MIT == (NERV_Motor_CmdKindTypeDef)model->control_mode)
+    {
+        if (!isfinite(model->control.profile.t_max_n_m) ||
+            (model->control.profile.t_max_n_m <= 0.0f) ||
+            !isfinite(model->control.profile.kp_max) || (model->control.profile.kp_max <= 0.0f) ||
+            !isfinite(model->control.profile.kd_max) || (model->control.profile.kd_max <= 0.0f))
+        {
+            return NERV_ERROR;
+        }
     }
 
     return NERV_OK;
@@ -629,6 +677,11 @@ static NERV_Motor_CmdTypeDef NERV_Motor_EffectiveCommand(const NERV_Motor_Instan
             cmd.u.scalar = NERV_Math_Clamp(cmd.u.scalar, -(float)self->config.control_limit,
                                            (float)self->config.control_limit);
         }
+        break;
+
+    case NERV_MOTOR_CMD_POSITION_VELOCITY:
+        cmd.u.position_velocity.position_rad *= sign;
+        cmd.u.position_velocity.velocity_radps *= sign;
         break;
 
     case NERV_MOTOR_CMD_MIT:

@@ -40,7 +40,7 @@
   * @brief 当前选择的平台.
   * @note  必须取 NERV_PLATFORM_STM32H7 或 NERV_PLATFORM_CUSTOM.
   */
-#define NERV_PLATFORM NERV_PLATFORM_NONE
+#define NERV_PLATFORM NERV_PLATFORM_STM32H7
 #endif
 
 #if (NERV_PLATFORM == NERV_PLATFORM_NONE)
@@ -164,6 +164,19 @@
 
 #if (NERV_USE_MOTOR_DJI != NERV_ENABLE) && (NERV_USE_MOTOR_DJI != NERV_DISABLE)
 #error "NERV_USE_MOTOR_DJI must be NERV_ENABLE or NERV_DISABLE."
+#endif
+
+#ifndef NERV_USE_MOTOR_DM
+/**
+  * @brief 达妙 CAN 电机协议族裁剪开关.
+  * @note  取 NERV_ENABLE 或 NERV_DISABLE.
+  * @note  关闭时达妙协议族的驱动源文件与型号符号不参与编译.
+  */
+#define NERV_USE_MOTOR_DM NERV_ENABLE
+#endif
+
+#if (NERV_USE_MOTOR_DM != NERV_ENABLE) && (NERV_USE_MOTOR_DM != NERV_DISABLE)
+#error "NERV_USE_MOTOR_DM must be NERV_ENABLE or NERV_DISABLE."
 #endif
 
 #endif /* NERV_USE_MOTOR */

@@ -49,6 +49,9 @@ _Static_assert((NERV_USE_MOTOR == NERV_ENABLE) || (NERV_USE_MOTOR == NERV_DISABL
 _Static_assert((NERV_USE_MOTOR_DJI == NERV_ENABLE) || (NERV_USE_MOTOR_DJI == NERV_DISABLE),
                "NERV_USE_MOTOR_DJI must be NERV_ENABLE or NERV_DISABLE.");
 
+_Static_assert((NERV_USE_MOTOR_DM == NERV_ENABLE) || (NERV_USE_MOTOR_DM == NERV_DISABLE),
+               "NERV_USE_MOTOR_DM must be NERV_ENABLE or NERV_DISABLE.");
+
 #endif /* NERV_USE_MOTOR */
 
 /* 底盘配置. 模块关闭时不检查其专属宏. */

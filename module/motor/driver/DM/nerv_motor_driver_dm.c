@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "config.h"
+#include "nerv_fdcan.h"
 #include "nerv_math.h"
 #include "nerv_motor_driver.h"
 #include "nerv_status.h"
@@ -368,5 +369,36 @@ const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity = {
     .ops   = &dm_ops,
     .model = &dm_model_position_velocity,
 };
+
+NERV_StatusTypeDef NERV_Motor_Dm_SendCommand(const NERV_FDCAN_InstanceTypeDef *bus,
+                                             const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
+                                             uint8_t command)
+{
+    NERV_FDCAN_FrameTypeDef frame;
+    NERV_Motor_FrameGeoTypeDef geo;
+    uint8_t index;
+
+    if ((NULL == bus) || (NULL == model))
+    {
+        return NERV_ERROR;
+    }
+
+    if (NERV_OK != NERV_Motor_Dm_GetFrameGeo(model, device_id, &geo))
+    {
+        return NERV_ERROR;
+    }
+
+    for (index = 0U; index < __NERV_DM_FRAME_LEN; index++)
+    {
+        frame.data[index] = 0xFFU;
+    }
+
+    frame.data[__NERV_DM_FRAME_LEN - 1U] = command;
+    frame.id                            = geo.tx_id;
+    frame.len                           = __NERV_DM_FRAME_LEN;
+    frame.flags                         = 0U;
+
+    return NERV_FDCAN_Transmit(bus, &frame);
+}
 
 #endif /* NERV_USE_MOTOR && NERV_USE_MOTOR_DM */

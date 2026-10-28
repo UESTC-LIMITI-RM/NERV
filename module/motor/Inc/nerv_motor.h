@@ -82,9 +82,9 @@ typedef struct NERV_Motor_Instance
 
     NERV_Motor_FbTypeDef fb;                   /**< 原始反馈, 转子量, 由 NERV_Motor_OnRx 写入 */
     NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_Update 刷新 */
-    uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_GetError 读取 */
+    uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_ReadError 读取 */
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */
-    NERV_Motor_CmdTypeDef target_cmd;          /**< 控制目标, 由 SetTarget 或 SetCmd 写入 */
+    NERV_Motor_ControlTypeDef target_control;  /**< 控制目标, 由 SetTarget 或 SetControl 写入 */
     uint32_t last_rx_ms;                       /**< 最近一次有效反馈的时刻, 单位 ms */
     bool offline_armed;                        /**< 离线监督已建立计时起点, 由模块维护 */
     bool initialized;                          /**< 初始化完成标志, 由 NERV_Motor_Init 置位 */
@@ -98,69 +98,37 @@ typedef struct NERV_Motor_Instance
 NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
                                    const NERV_Motor_ConfigTypeDef *config);
 
-/**
-  * @brief  设置电机目标控制编码.
-  * @note   target 为电机控制编码, 量纲同型号描述符的 control_cmd_limit (如 16384, 25000),
-  *         与反馈电流等物理量不在同一单位. 调用方若以物理量配置, 可用
-  *         NERV_Motor_CmdFromPhysical 先换算为控制编码.
-  * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
-  */
 NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target);
 
-/**
-  * @brief  设置电机控制目标（多字段）.
-  * @note   cmd 按 kind 选择有效分支, 各驱动只支持自己协议的分支, 不支持时发送返回
-  *         NERV_ERROR. 只有单一控制量的简单协议可继续用 NERV_Motor_SetTarget.
-  * @note   NOT ISR-safe. 写实例目标值, 与 Update 同属控制链.
-  */
-NERV_StatusTypeDef NERV_Motor_SetCmd(NERV_Motor_InstanceTypeDef *self,
-                                     const NERV_Motor_CmdTypeDef *cmd);
+NERV_StatusTypeDef NERV_Motor_SetControl(NERV_Motor_InstanceTypeDef *self,
+                                         const NERV_Motor_ControlTypeDef *control);
 
-/**
-  * @brief  刷新测量值, 运行在线监督并积分离线计时.
-  * @note   NOT ISR-safe. 写实例测量与错误位, 更新计时基准.
-  */
 NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
 
-/**
-  * @brief  按组刷新并下发一组电机的指令帧.
-  * @note   NOT ISR-safe. 遍历实例状态, 经总线发送.
-  */
 NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                           uint32_t now_ms);
 
-/**
-  * @brief  把接收到的反馈帧交给电机实例解析.
-  * @note   ISR-safe. 设计为在总线接收中断中调用, 只做拷贝, 置标志与有限的状态更新,
-  *         不阻塞, 不分配内存, 不调用日志.
-  */
 void NERV_Motor_OnRx(NERV_Motor_InstanceTypeDef *self, const NERV_FDCAN_FrameTypeDef *frame);
 
-/**
-  * @brief  读取电机机构系测量值.
-  * @note   NOT ISR-safe. 测量值由 Update 在任务上下文写入, 不应在中断中读取.
-  */
 NERV_StatusTypeDef NERV_Motor_GetMeasurement(const NERV_Motor_InstanceTypeDef *self,
                                              NERV_Motor_MeasurementTypeDef *measurement);
 
-/**
-  * @brief  读取电机粘滞错误位.
-  * @note   NOT ISR-safe. 错误位由任务上下文的 Update 与中断上下文的 OnRx 共同维护,
-  *         ISR 读取可能看到不一致状态.
-  */
-uint32_t NERV_Motor_GetError(const NERV_Motor_InstanceTypeDef *self);
+uint32_t NERV_Motor_ReadError(const NERV_Motor_InstanceTypeDef *self);
 
-/**
-  * @brief  清除电机错误位.
-  * @note   NOT ISR-safe. 读改写实例错误位, 与 OnRx 可能竞争.
-  */
 void NERV_Motor_ClearError(NERV_Motor_InstanceTypeDef *self, uint32_t mask);
 
-/**
-  * @brief  进入安全状态, 目标清零.
-  * @note   NOT ISR-safe. 写实例状态.
-  */
 NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self);
+
+NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self);
+
+NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self);
+
+NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self);
+
+NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
+                                      NERV_Motor_ControlKindTypeDef mode);
+
+NERV_StatusTypeDef NERV_Motor_SaveZero(NERV_Motor_InstanceTypeDef *self);
 
 #ifdef __cplusplus
 }

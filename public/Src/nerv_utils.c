@@ -46,9 +46,9 @@ float NERV_Utils_RpmToRadps(float rpm)
   * @brief  把角速度从 rad/s 转换为 rpm.
   * @param  radps 角速度, 单位 rad/s. 正负号表示旋转方向.
   * @return 转速, 单位 rpm. 非有限输入原样返回.
-  *         有限输入的结果超出 float 范围时返回带符号的无穷大.
+  *         有限输入的结果超出 float 范围时饱和到带符号的 FLT_MAX.
   * @note   1 rad/s 等于 60/(2π) rpm.
-  * @note   极大输入可能溢出, 此时返回带符号的无穷大.
+  * @note   极大输入可能溢出, 此时饱和到带符号的 FLT_MAX.
   * @note   ISR-safe.
   */
 float NERV_Utils_RadpsToRpm(float radps)
@@ -60,7 +60,7 @@ float NERV_Utils_RadpsToRpm(float radps)
 
     if (fabsf(radps) >= __NERV_UTILS_MAX_RADPS)
     {
-        return copysignf(INFINITY, radps);
+        return copysignf(FLT_MAX, radps);
     }
 
     return radps * __NERV_UTILS_RPM_PER_RADPS;

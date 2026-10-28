@@ -103,7 +103,7 @@ struct NERV_GPIO_Instance
 
 /* 通用接口. 全部为静态内联, 只做参数检查与操作表分发, 行为契约见各函数文档.
  * NERV_GPIO_Write 与 NERV_GPIO_Read 需在 NERV_GPIO_Init 之后调用,
- * NERV_GPIO_DeInit 之后不应再调用二者. */
+ * NERV_GPIO_DeInit 之后不应再调用这两个函数. */
 
 /**
   * @brief  初始化 GPIO 引脚.

@@ -44,14 +44,14 @@ typedef struct NERV_Motor_Fb
 
 /**
   * @brief  控制量种类.
-  * @note   与 NERV_Motor_CmdTypeDef 的联合体成员一一对应, 驱动按本值选择解码分支.
+  * @note   与 NERV_Motor_ControlTypeDef 的联合体成员一一对应, 驱动按本值选择解码分支.
   */
 typedef enum
 {
-    NERV_MOTOR_CMD_SCALAR = 0U,       /**< 单一控制量, 单位由型号描述符约定 (如电流, 电压或速度) */
-    NERV_MOTOR_CMD_MIT,               /**< MIT 模式, 位置/速度/刚度/阻尼/前馈转矩 */
-    NERV_MOTOR_CMD_POSITION_VELOCITY, /**< 位置速度模式, 目标位置与限速 */
-} NERV_Motor_CmdKindTypeDef;
+    NERV_MOTOR_CONTROL_SCALAR = 0U, /**< 单一控制量, 单位由型号描述符约定 (如电流, 电压或速度) */
+    NERV_MOTOR_CONTROL_MIT,         /**< MIT 模式, 位置/速度/刚度/阻尼/前馈转矩 */
+    NERV_MOTOR_CONTROL_POSITION_VELOCITY, /**< 位置速度模式, 目标位置与限速 */
+} NERV_Motor_ControlKindTypeDef;
 
 /**
   * @brief  电机控制目标.
@@ -65,7 +65,7 @@ typedef enum
   */
 typedef struct
 {
-    NERV_Motor_CmdKindTypeDef kind; /**< 有效分支标识 */
+    NERV_Motor_ControlKindTypeDef kind; /**< 有效分支标识 */
     union
     {
         float scalar; /**< SCALAR 分支, 单位由型号描述符 control_full_scale 约定 */
@@ -83,7 +83,7 @@ typedef struct
             float velocity_radps; /**< 限速, 单位 rad/s */
         } position_velocity;
     } u;
-} NERV_Motor_CmdTypeDef;
+} NERV_Motor_ControlTypeDef;
 
 /**
   * @brief  描述符中表示反馈帧无此字段的偏移值.
@@ -119,11 +119,11 @@ typedef struct
     int16_t fb_control_cmd_limit; /**< 反馈中控制量字段的编码满量程 */
     bool fb_bit_packed;           /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
     bool
-        tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id 偏移, false 表示按低组/高组选帧 */
+        tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id (不减去 id_min), false 表示按低组/高组选帧 */
     bool
         rx_id_offset_by_device; /**< true 表示反馈帧标识符等于 rx_id_base 加设备 id, false 表示固定为 rx_id_base */
     uint8_t
-        control_mode; /**< 控制模式, 取 NERV_Motor_CmdKindTypeDef, 决定 control 联合体的有效成员 */
+        control_mode; /**< 控制模式, 取 NERV_Motor_ControlKindTypeDef, 决定 control 联合体的有效成员 */
     union
     {
         struct
@@ -149,7 +149,7 @@ typedef struct
   *         结果为有符号控制编码, 范围约 ±control.scalar.cmd_limit. 只适用于 SCALAR 控制
   *         模式, 多字段模式由驱动自行换算.
   */
-#define NERV_Motor_CmdFromPhysical(_model, _physical)                 \
+#define NERV_Motor_ControlFromPhysical(_model, _physical)             \
     ((float)(_physical) * (float)(_model)->control.scalar.cmd_limit / \
      (_model)->control.scalar.full_scale)
 
@@ -163,6 +163,20 @@ typedef struct
     uint32_t rx_id; /**< 反馈帧标识符 */
     uint8_t len;    /**< 帧数据长度, 单位 byte */
 } NERV_Motor_FrameGeoTypeDef;
+
+/**
+  * @brief  驱动可选能力, 每位一项能力, 可组合成位掩码.
+  * @note   驱动在描述符的 capabilities 中声明支持的能力, 核心层按位判断.
+  *         声明与操作表函数指针必须一致, NERV_Motor_Init 会交叉校验.
+  */
+typedef enum
+{
+    NERV_MOTOR_CAP_ENABLE      = 1U << 0, /**< 使能 */
+    NERV_MOTOR_CAP_DISABLE     = 1U << 1, /**< 失能 */
+    NERV_MOTOR_CAP_CLEAR_FAULT = 1U << 2, /**< 清除故障 */
+    NERV_MOTOR_CAP_SET_MODE    = 1U << 3, /**< 运行期切换控制模式 */
+    NERV_MOTOR_CAP_SAVE_ZERO   = 1U << 4, /**< 保存当前位置为零点 */
+} NERV_Motor_CapabilityTypeDef;
 
 /**
   * @brief  电机驱动操作表.
@@ -185,9 +199,22 @@ typedef struct
     NERV_StatusTypeDef (*get_frame_geo)(const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
                                         NERV_Motor_FrameGeoTypeDef *geo);
     NERV_StatusTypeDef (*encode_tx)(const NERV_Motor_ModelTypeDef *model, uint8_t *frame,
-                                    uint8_t device_id, const NERV_Motor_CmdTypeDef *cmd);
+                                    uint8_t device_id, const NERV_Motor_ControlTypeDef *control);
     NERV_StatusTypeDef (*decode_fb)(const NERV_Motor_ModelTypeDef *model, const uint8_t *frame,
                                     uint8_t len, NERV_Motor_FbTypeDef *fb);
+
+    /* 可选能力, 驱动不支持时置 NULL, 核心层按空操作处理. */
+    NERV_StatusTypeDef (*enable)(const NERV_FDCAN_InstanceTypeDef *bus,
+                                 const NERV_Motor_ModelTypeDef *model, uint8_t device_id);
+    NERV_StatusTypeDef (*disable)(const NERV_FDCAN_InstanceTypeDef *bus,
+                                  const NERV_Motor_ModelTypeDef *model, uint8_t device_id);
+    NERV_StatusTypeDef (*clear_fault)(const NERV_FDCAN_InstanceTypeDef *bus,
+                                      const NERV_Motor_ModelTypeDef *model, uint8_t device_id);
+    NERV_StatusTypeDef (*save_zero)(const NERV_FDCAN_InstanceTypeDef *bus,
+                                    const NERV_Motor_ModelTypeDef *model, uint8_t device_id);
+    NERV_StatusTypeDef (*set_mode)(const NERV_FDCAN_InstanceTypeDef *bus,
+                                   const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
+                                   NERV_Motor_ControlKindTypeDef mode);
 } NERV_Motor_Driver_OpsTypeDef;
 
 /**
@@ -197,99 +224,28 @@ typedef struct
   */
 typedef struct
 {
+    uint32_t capabilities;                   /**< NERV_MOTOR_CAP_* 位掩码, 声明支持的可选能力 */
     const NERV_Motor_Driver_OpsTypeDef *ops; /**< 协议族操作表 */
     const NERV_Motor_ModelTypeDef *model;    /**< 型号描述符 */
 } NERV_Motor_DriverTypeDef;
 
+NERV_StatusTypeDef NERV_Motor_Driver_NotSupported(const NERV_FDCAN_InstanceTypeDef *bus,
+                                                  const NERV_Motor_ModelTypeDef *model,
+                                                  uint8_t device_id);
+
+NERV_StatusTypeDef NERV_Motor_Driver_NotSupportedSetMode(const NERV_FDCAN_InstanceTypeDef *bus,
+                                                         const NERV_Motor_ModelTypeDef *model,
+                                                         uint8_t device_id,
+                                                         NERV_Motor_ControlKindTypeDef mode);
+
+/* 具体驱动声明, 由驱动层统一汇总, 使用者包含本文件即可拿到全部驱动常量. */
 #if (NERV_USE_MOTOR_DJI == NERV_ENABLE)
-
-/**
-  * @brief DJI M3508 电机 (C620 电调) 驱动.
-  * @note  由 module/motor/driver/DJI/nerv_motor_driver_dji.c 提供.
-  * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji3508;
-
-/**
-  * @brief DJI M2006 电机 (C610 电调) 驱动.
-  * @note  由 module/motor/driver/DJI/nerv_motor_driver_dji.c 提供.
-  * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji2006;
-
-/**
-  * @brief DJI GM6020 电机电流控制模式驱动.
-  * @note  由 module/motor/driver/DJI/nerv_motor_driver_dji.c 提供.
-  * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
-  * @warning 反馈帧标识符区间 0x205 到 0x20B 与 C620, C610 电调 id 5 到 8 的反馈区间
-  *           0x205 到 0x208 重叠, 同总线混编时会互相误收, 使用时必须错开设备 id
-  *           或避开混编.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current;
-
-/**
-  * @brief DJI GM6020 电机电压控制模式驱动.
-  * @note  由 module/motor/driver/DJI/nerv_motor_driver_dji.c 提供.
-  * @note  只在 NERV_USE_MOTOR_DJI 为 NERV_ENABLE 时声明.
-  * @warning 电压模式控制帧标识符 0x1FF 与 C620 电调高组指令标识符相同, 混编
-  *           总线上会冲突, 使用时必须错开设备 id 或避开电压模式.
-  * @warning 反馈帧标识符区间 0x205 到 0x20B 与 C620, C610 电调 id 5 到 8 的反馈区间
-  *           0x205 到 0x208 重叠, 同总线混编时会互相误收, 使用时必须错开设备 id
-  *           或避开混编.
-  * @warning 本型号的控制量单位是协议给定值 (满量程 25000, 无量纲), 不是电流. 电机实例
-  *           配置的 control_limit 按同单位解释, 按电流安培数配置会得到近乎为零的输出.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage;
-
-#endif /* NERV_USE_MOTOR_DJI */
+#include "nerv_motor_driver_dji.h"
+#endif
 
 #if (NERV_USE_MOTOR_DM == NERV_ENABLE)
-
-/**
-  * @brief 达妙 DM-J4310-2EC MIT 模式驱动.
-  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
-  * @note  控制帧标识符为 0x000 加设备 id, 反馈帧标识符由 Master ID 配置.
-  * @note  控制量为 NERV_MOTOR_CMD_MIT, 位置/速度/刚度/阻尼/前馈转矩位打包进 8 字节.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmMit;
-
-/**
-  * @brief 达妙 DM-J4310-2EC 速度模式驱动.
-  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
-  * @note  控制帧标识符为 0x200 加设备 id, 控制量为 NERV_MOTOR_CMD_SCALAR, 单位 rad/s.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmVelocity;
-
-/**
-  * @brief 达妙 DM-J4310-2EC 位置速度模式驱动.
-  * @note  由 module/motor/driver/DM/nerv_motor_driver_dm.c 提供.
-  * @note  控制帧标识符为 0x100 加设备 id, 控制量为 NERV_MOTOR_CMD_POSITION_VELOCITY.
-  */
-extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity;
-
-/** @brief 达妙特殊命令码, 占用 8 字节帧的最后一字节, 前 7 字节为 0xFF. */
-#define NERV_MOTOR_DM_CMD_CLEAR_ERROR 0xFBU /**< 清除故障 */
-#define NERV_MOTOR_DM_CMD_ENABLE      0xFCU /**< 使能电机 */
-#define NERV_MOTOR_DM_CMD_DISABLE     0xFDU /**< 失能电机 */
-#define NERV_MOTOR_DM_CMD_SAVE_ZERO   0xFEU /**< 当前位置保存为零点 */
-
-/**
-  * @brief  发送达妙特殊命令帧.
-  * @param  bus 电机所在总线, 不得为 NULL.
-  * @param  model 型号描述符, 不得为 NULL.
-  * @param  device_id 电机 CAN ID, 范围 model 的 id_min 到 id_max.
-  * @param  command 命令码, 取 NERV_MOTOR_DM_CMD_*.
-  * @retval NERV_OK 帧已交给总线.
-  * @retval NERV_ERROR 参数为 NULL, 设备 id 越界, 或总线发送失败.
-  * @note   命令帧的 CAN ID 等于当前控制模式的控制帧 ID, 数据为 7 字节 0xFF 加命令码.
-  * @note   电机必须使能后才能执行控制帧; 掉线后需要重新使能.
-  * @note   NOT ISR-safe. 经平台适配层发送.
-  */
-NERV_StatusTypeDef NERV_Motor_Dm_SendCommand(const NERV_FDCAN_InstanceTypeDef *bus,
-                                             const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
-                                             uint8_t command);
-
-#endif /* NERV_USE_MOTOR_DM */
+#include "nerv_motor_driver_dm.h"
+#endif
 
 #ifdef __cplusplus
 }

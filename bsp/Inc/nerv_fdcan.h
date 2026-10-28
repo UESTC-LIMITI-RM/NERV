@@ -112,9 +112,6 @@ typedef void (*NERV_FDCAN_RxCallbackTypeDef)(void *user, const NERV_FDCAN_FrameT
   *                             之前调用. NOT ISR-safe.
   *         - transmit: 非阻塞发送, 不修改实例, self 为 const. 没有空闲发送邮箱时
   *                     返回 NERV_BUSY. 能否在中断中调用由平台适配层约定.
-  *         - get_error: 返回低 24 位粘滞错误位, 读取不清除. 高 8 位域号由
-  *                      NERV_FDCAN_GetError 重建.
-  *         - clear_error: 清除 mask 中置位的低 24 位错误位. mask 已由通用接口掩码.
   */
 typedef struct
 {
@@ -125,8 +122,6 @@ typedef struct
                                            const NERV_FDCAN_FilterTypeDef *filters, uint8_t count);
     NERV_StatusTypeDef (*transmit)(const NERV_FDCAN_InstanceTypeDef *self,
                                    const NERV_FDCAN_FrameTypeDef *frame);
-    uint32_t (*get_error)(const NERV_FDCAN_InstanceTypeDef *self);
-    void (*clear_error)(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
 } NERV_FDCAN_OpsTypeDef;
 
 /**
@@ -346,55 +341,6 @@ static inline void NERV_FDCAN_OnRx(NERV_FDCAN_InstanceTypeDef *self,
     {
         callback(user, frame);
     }
-}
-
-/**
-  * @brief  读取 FDCAN 错误位.
-  * @param  self 实例指针, 可以为 NULL.
-  * @return 粘滞错误位掩码. 高 8 位为 FDCAN 域号, 低 24 位为错误位, 可取
-  *         NERV_ERR_FDCAN_FILTER, NERV_ERR_FDCAN_TX_MAILBOX 与
-  *         NERV_ERR_FDCAN_RX_OVERRUN. self 为 NULL 或操作表未绑定时返回
-  *         NERV_ERR_NONE.
-  * @note   读取不清除错误位.
-  * @note   错误位由平台适配层在中断中置位, 读取与清除的原子性由平台适配层保证.
-  * @note   ISR-safe. 只读转发, 不修改实例状态.
-  */
-static inline uint32_t NERV_FDCAN_GetError(const NERV_FDCAN_InstanceTypeDef *self)
-{
-    uint32_t bits;
-
-    if ((NULL == self) || (NULL == self->ops) || (NULL == self->ops->get_error))
-    {
-        return NERV_ERR_NONE;
-    }
-
-    bits = self->ops->get_error(self) & NERV_ERR_BITS_MASK;
-
-    if (0U != (bits & NERV_ERR_FDCAN_BITS_MASK))
-    {
-        return NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | bits;
-    }
-
-    return bits;
-}
-
-/**
-  * @brief  清除 FDCAN 错误位.
-  * @param  self 实例指针, 可以为 NULL.
-  * @param  mask 待清除的错误位掩码. 只使用低 24 位, 高 8 位域号被忽略.
-  * @note   只清除 mask 中置位的错误位, 未置位的错误位保持不变.
-  * @note   self 为 NULL 或操作表未绑定时为空操作.
-  * @note   ISR-safe. 本函数只转发并掩码, 不修改实例状态, 可在中断中调用, 前提是平台
-  *         适配层的 clear_error 实现也 ISR-safe.
-  */
-static inline void NERV_FDCAN_ClearError(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask)
-{
-    if ((NULL == self) || (NULL == self->ops) || (NULL == self->ops->clear_error))
-    {
-        return;
-    }
-
-    self->ops->clear_error(self, mask & NERV_ERR_BITS_MASK);
 }
 
 #ifdef __cplusplus

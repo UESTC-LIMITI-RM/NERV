@@ -225,15 +225,15 @@ static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeD
   */
 static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef *model,
                                                   uint8_t *frame, uint8_t device_id,
-                                                  const NERV_Motor_CmdTypeDef *cmd)
+                                                  const NERV_Motor_ControlTypeDef *control)
 {
-    float control;
+    float control_value;
     float control_clamped;
     int32_t raw;
     uint8_t offset;
 
-    if ((NULL == model) || (NULL == frame) || (NULL == cmd) ||
-        (cmd->kind != NERV_MOTOR_CMD_SCALAR) || !isfinite(cmd->u.scalar))
+    if ((NULL == model) || (NULL == frame) || (NULL == control) ||
+        (control->kind != NERV_MOTOR_CONTROL_SCALAR) || !isfinite(control->u.scalar))
     {
         return NERV_ERROR;
     }
@@ -243,9 +243,9 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    control = cmd->u.scalar;
+    control_value = control->u.scalar;
 
-    control_clamped = NERV_Math_Clamp(control, -(float)model->control.scalar.cmd_limit,
+    control_clamped = NERV_Math_Clamp(control_value, -(float)model->control.scalar.cmd_limit,
                                       (float)model->control.scalar.cmd_limit);
 
     raw = (int32_t)control_clamped;
@@ -321,35 +321,44 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
     return NERV_OK;
 }
 
-/** @brief DJI CAN 电调协议族操作表. */
+/** @brief DJI CAN 电调协议族操作表, 不提供使能与模式切换等可选能力. */
 static const NERV_Motor_Driver_OpsTypeDef dji_ops = {
     .get_frame_geo = NERV_Motor_Dji_GetFrameGeo,
     .encode_tx     = NERV_Motor_Dji_EncodeTx,
     .decode_fb     = NERV_Motor_Dji_DecodeFb,
+    .enable        = NERV_Motor_Driver_NotSupported,
+    .disable       = NERV_Motor_Driver_NotSupported,
+    .clear_fault   = NERV_Motor_Driver_NotSupported,
+    .set_mode      = NERV_Motor_Driver_NotSupportedSetMode,
+    .save_zero     = NERV_Motor_Driver_NotSupported,
 };
 
 /** @brief DJI M3508 电机 (C620 电调) 驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji3508 = {
-    .ops   = &dji_ops,
-    .model = &dji_model_3508,
+    .capabilities = 0U,
+    .ops          = &dji_ops,
+    .model        = &dji_model_3508,
 };
 
 /** @brief DJI M2006 电机 (C610 电调) 驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji2006 = {
-    .ops   = &dji_ops,
-    .model = &dji_model_2006,
+    .capabilities = 0U,
+    .ops          = &dji_ops,
+    .model        = &dji_model_2006,
 };
 
 /** @brief DJI GM6020 电机电流控制模式驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Current = {
-    .ops   = &dji_ops,
-    .model = &dji_model_6020_current,
+    .capabilities = 0U,
+    .ops          = &dji_ops,
+    .model        = &dji_model_6020_current,
 };
 
 /** @brief DJI GM6020 电机电压控制模式驱动实例. */
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage = {
-    .ops   = &dji_ops,
-    .model = &dji_model_6020_voltage,
+    .capabilities = 0U,
+    .ops          = &dji_ops,
+    .model        = &dji_model_6020_voltage,
 };
 
 #endif /* NERV_USE_MOTOR_DJI */

@@ -42,16 +42,8 @@ extern "C" {
   */
 #define NERV_UTILS_TIMEOUT_S_TO_MS(_s) ((uint32_t)((_s) * 1000U))
 
-/**
-  * @brief  转速单位转换, 转每分转换为弧度每秒.
-  * @note   ISR-safe. 纯函数, 不读写共享状态.
-  */
 float NERV_Utils_RpmToRadps(float rpm);
 
-/**
-  * @brief  转速单位转换, 弧度每秒转换为转每分.
-  * @note   ISR-safe. 纯函数, 不读写共享状态.
-  */
 float NERV_Utils_RadpsToRpm(float radps);
 
 #ifdef __cplusplus

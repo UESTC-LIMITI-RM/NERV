@@ -27,7 +27,6 @@
 #define __NERV_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
 #define __NERV_MOTOR_CONTROL_LIMIT_MAX       32767U
 
-/* 内部辅助函数声明. */
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
 static float NERV_Motor_DirectionSign(const NERV_Motor_ConfigTypeDef *config);

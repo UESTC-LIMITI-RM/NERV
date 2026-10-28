@@ -32,10 +32,6 @@
   * @note   极大输入可能上溢为无穷大.
   * @note   ISR-safe.
   */
-/**
-  * @brief  转速单位转换, 转每分转换为弧度每秒.
-  * @note   ISR-safe. 纯函数, 不读写共享状态.
-  */
 float NERV_Utils_RpmToRadps(float rpm)
 {
     if (!isfinite(rpm))
@@ -52,13 +48,8 @@ float NERV_Utils_RpmToRadps(float rpm)
   * @return 转速, 单位 rpm. 非有限输入原样返回.
   *         有限输入的结果超出 float 范围时饱和到带符号的 FLT_MAX.
   * @note   1 rad/s 等于 60/(2π) rpm.
-  * @note   极大输入可能溢出, 此时饱和到带符号的 FLT_MAX, 不返回无穷大, 以兼容
-  *         Keil AC6 的 --fpmode=fast (该模式禁用 Inf/NaN).
+  * @note   极大输入可能溢出, 此时饱和到带符号的 FLT_MAX.
   * @note   ISR-safe.
-  */
-/**
-  * @brief  转速单位转换, 弧度每秒转换为转每分.
-  * @note   ISR-safe. 纯函数, 不读写共享状态.
   */
 float NERV_Utils_RadpsToRpm(float radps)
 {

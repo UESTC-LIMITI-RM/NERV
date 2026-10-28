@@ -32,6 +32,10 @@
   * @note   极大输入可能上溢为无穷大.
   * @note   ISR-safe.
   */
+/**
+  * @brief  转速单位转换, 转每分转换为弧度每秒.
+  * @note   ISR-safe. 纯函数, 不读写共享状态.
+  */
 float NERV_Utils_RpmToRadps(float rpm)
 {
     if (!isfinite(rpm))
@@ -46,10 +50,15 @@ float NERV_Utils_RpmToRadps(float rpm)
   * @brief  把角速度从 rad/s 转换为 rpm.
   * @param  radps 角速度, 单位 rad/s. 正负号表示旋转方向.
   * @return 转速, 单位 rpm. 非有限输入原样返回.
-  *         有限输入的结果超出 float 范围时返回带符号的无穷大.
+  *         有限输入的结果超出 float 范围时饱和到带符号的 FLT_MAX.
   * @note   1 rad/s 等于 60/(2π) rpm.
-  * @note   极大输入可能溢出, 此时返回带符号的无穷大.
+  * @note   极大输入可能溢出, 此时饱和到带符号的 FLT_MAX, 不返回无穷大, 以兼容
+  *         Keil AC6 的 --fpmode=fast (该模式禁用 Inf/NaN).
   * @note   ISR-safe.
+  */
+/**
+  * @brief  转速单位转换, 弧度每秒转换为转每分.
+  * @note   ISR-safe. 纯函数, 不读写共享状态.
   */
 float NERV_Utils_RadpsToRpm(float radps)
 {
@@ -60,7 +69,7 @@ float NERV_Utils_RadpsToRpm(float radps)
 
     if (fabsf(radps) >= __NERV_UTILS_MAX_RADPS)
     {
-        return copysignf(INFINITY, radps);
+        return copysignf(FLT_MAX, radps);
     }
 
     return radps * __NERV_UTILS_RPM_PER_RADPS;

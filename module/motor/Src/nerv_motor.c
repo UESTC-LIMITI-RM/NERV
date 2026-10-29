@@ -602,7 +602,9 @@ NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
   * @param  mode 目标控制模式, 取 NERV_Motor_ControlKindTypeDef.
   * @retval NERV_OK 已下发或驱动不支持该能力.
   * @retval NERV_ERROR 实例为 NULL 或未初始化.
-  * @note   只写运行期模式, 不保存到参数区; 掉电保持需驱动另行支持.
+  * @warning 达妙等驱动会把模式写入参数区并掉电保存. 参数区擦写寿命有限, 每个
+  *          控制周期都调用会在数分钟内耗尽寿命并损坏电机. 只能在初始化或模式变更
+  *          时调用一次.
   */
 NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
                                       NERV_Motor_ControlKindTypeDef mode)
@@ -631,6 +633,8 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
   * @param  self 实例指针.
   * @retval NERV_OK 已下发或驱动不支持该能力.
   * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @warning 写入参数区并掉电保存. 参数区擦写寿命有限, 每个控制周期都调用会在数分钟内
+  *          耗尽寿命并损坏电机. 只能在标定零点时调用一次.
   */
 NERV_StatusTypeDef NERV_Motor_SaveZero(NERV_Motor_InstanceTypeDef *self)
 {

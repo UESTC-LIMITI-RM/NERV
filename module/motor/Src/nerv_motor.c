@@ -29,15 +29,14 @@
 
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
-static float NERV_Motor_DirectionSign(const NERV_Motor_ConfigTypeDef *config);
+static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config);
 static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
                                                const NERV_Motor_FbTypeDef *fb,
                                                NERV_Motor_MeasurementTypeDef *measurement);
-static NERV_Motor_ControlTypeDef
-NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self);
+static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self);
 static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
                                                 uint8_t *frame);
-static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
+static void NERV_Motor_UpdateHealth(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
 static bool NERV_Motor_SameGroup(const NERV_Motor_InstanceTypeDef *lhs,
                                  const NERV_Motor_InstanceTypeDef *rhs);
 static void NERV_Motor_SetGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
@@ -252,7 +251,7 @@ NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t 
         return NERV_ERROR;
     }
 
-    NERV_Motor_Supervise(self, now_ms);
+    NERV_Motor_UpdateHealth(self, now_ms);
 
     return NERV_OK;
 }
@@ -805,7 +804,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
   * @param  config 实例配置, 由调用方保证不为 NULL.
   * @return invert_direction 为 true 时返回 -1.0f, 否则返回 1.0f.
   */
-static float NERV_Motor_DirectionSign(const NERV_Motor_ConfigTypeDef *config)
+static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config)
 {
     return config->invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
 }
@@ -831,7 +830,7 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
         return NERV_ERROR;
     }
 
-    sign = NERV_Motor_DirectionSign(config);
+    sign = NERV_Motor_InvertSign(config);
 
     measurement->angle_rad =
         NERV_Math_Wrap(fb->angle_rad / config->gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
@@ -852,13 +851,13 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
   *         同量纲 (如 16384, 25000). MIT 的范围由描述符的 p_max, v_max, t_max 约束.
   * @note   control_limit 为 NERV_DISABLE 时跳过实例限幅, 协议满量程限幅由驱动完成.
   */
-static NERV_Motor_ControlTypeDef NERV_Motor_EffectiveCommand(const NERV_Motor_InstanceTypeDef *self)
+static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self)
 {
     NERV_Motor_ControlTypeDef control;
     float sign;
 
     control = self->target_control;
-    sign    = NERV_Motor_DirectionSign(&self->config);
+    sign    = NERV_Motor_InvertSign(&self->config);
 
     switch (control.kind)
     {
@@ -904,7 +903,7 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
 {
     NERV_Motor_ControlTypeDef control;
 
-    control = NERV_Motor_EffectiveCommand(self);
+    control = NERV_Motor_ActiveControl(self);
 
     return self->config.driver->ops->encode_tx(self->config.driver->model, frame,
                                                self->config.device_id, &control);
@@ -924,7 +923,7 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
   *         因此本函数必须在 NERV_Motor_ConvertFb 之后调用.
   * @note   错误位为粘滞, 只由 NERV_Motor_ClearError 清除.
   */
-static void NERV_Motor_Supervise(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms)
+static void NERV_Motor_UpdateHealth(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms)
 {
     if (self->fb_fresh)
     {

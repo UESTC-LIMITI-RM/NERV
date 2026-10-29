@@ -92,6 +92,17 @@ typedef struct
 #define NERV_MOTOR_FB_OFF_NONE 0xFFU
 
 /**
+  * @brief  SCALAR 控制量的物理量纲.
+  * @note   仅 SCALAR 控制模式有效, 用于区分 control.scalar.full_scale 的单位.
+  */
+typedef enum
+{
+    NERV_MOTOR_SCALAR_CURRENT = 0U, /**< 电流, 单位 A */
+    NERV_MOTOR_SCALAR_SPEED,        /**< 角速度, 单位 rad/s */
+    NERV_MOTOR_SCALAR_VOLTAGE,      /**< 电压, 单位由协议约定 */
+} NERV_Motor_ScalarQuantityTypeDef;
+
+/**
   * @brief  电机型号描述符.
   * @note   承载同一协议族内不同型号的全部差异: 标识符映射, 帧长, 反馈字段布局与
   *         刻度. 协议族代码只读描述符, 不包含型号分支.
@@ -124,6 +135,8 @@ typedef struct
         rx_id_offset_by_device; /**< true 表示反馈帧标识符等于 rx_id_base 加设备 id, false 表示固定为 rx_id_base */
     uint8_t
         control_mode; /**< 控制模式, 取 NERV_Motor_ControlKindTypeDef, 决定 control 联合体的有效成员 */
+    NERV_Motor_ScalarQuantityTypeDef
+        scalar_quantity; /**< SCALAR 控制量量纲, 仅 SCALAR 模式有效, 决定 full_scale 的单位 */
     union
     {
         struct

@@ -91,6 +91,7 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_SCALAR,
+    .scalar_quantity             = NERV_MOTOR_SCALAR_SPEED,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
     .control.profile.t_max_n_m   = 10.0f,

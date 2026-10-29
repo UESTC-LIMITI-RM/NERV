@@ -29,6 +29,9 @@ extern "C" {
   */
 #define NERV_MATH_TWO_PI 6.28318530717958647692f
 
+/** @brief 每秒的毫秒数, 用于把毫秒间隔换算为秒. */
+#define NERV_MATH_MS_PER_S 1000.0f
+
 float NERV_Math_Wrap(float value, float min_value, float max_value);
 
 NERV_StatusTypeDef NERV_Math_IsClose(float a, float b, float tolerance, bool *is_close);

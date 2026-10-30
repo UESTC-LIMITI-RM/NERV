@@ -1,0 +1,11 @@
+-std=c11
+-Ipublic/Inc
+-Iconfig/Inc
+-Ibsp/Inc
+-Imodule/motor/Inc
+-Imodule/motor/driver
+-Imodule/motor/driver/DM
+-Imodule/motor/driver/DJI
+-Imodule/chassis/Inc
+-DNERV_PLATFORM=NERV_PLATFORM_CUSTOM
+-DNERV_CHASSIS_TYPE=NERV_CHASSIS_TYPE_OMNI

@@ -33,9 +33,9 @@ extern "C" {
   */
 typedef struct NERV_Motor_Fb
 {
-    float angle_rad;      /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
-    float speed_radps;    /**< 转子转速, 单位 rad/s, 逆时针为正. */
-    float current_a;      /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. */
+    float angle_rad;   /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
+    float speed_radps; /**< 转子转速, 单位 rad/s, 逆时针为正. */
+    float current_a; /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. 型号不上报时置 0. */
     float torque_n_m;     /**< 转子输出转矩, 单位 N·m, 型号不上报时置 0. */
     int8_t temperature_c; /**< 电机温度, 单位 ℃. 由电调上报, 可用性取决于温度传感器与电调固件. */
     int8_t temperature_mos_c; /**< 驱动器 MOS 温度, 单位 ℃, 型号不上报时置 INT8_MIN. */
@@ -133,6 +133,9 @@ typedef struct
         tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id (不减去 id_min), false 表示按低组/高组选帧 */
     bool
         rx_id_offset_by_device; /**< true 表示反馈帧标识符等于 rx_id_base 加设备 id, false 表示固定为 rx_id_base */
+    float torque_constant_n_m_per_a; /**< 手册给出的扭矩常数, 单位 N·m/A, 0 表示未提供 */
+    float rated_gear_ratio;          /**< 手册标称减速比, 无减速箱填 1, 必须大于 0 */
+    bool fb_torque_present; /**< true 表示反馈直接给出转矩, false 表示由电流乘扭矩常数换算 */
     uint8_t
         control_mode; /**< 控制模式, 取 NERV_Motor_ControlKindTypeDef, 决定 control 联合体的有效成员 */
     NERV_Motor_ScalarQuantityTypeDef
@@ -205,7 +208,8 @@ typedef enum
   *                       协议满量程, 实例级限幅由调用方在调用前完成. ISR-safe.
   *         - decode_fb: 把反馈帧解码为电机反馈, len 必须等于 model 的 frame_len,
   *                      失败时不修改输出结构. 温度按有符号 int8 透传, 型号无温度
-  *                      字段时置 INT8_MIN. ISR-safe.
+  *                      字段时置 INT8_MIN. 型号不上报的电流, 转矩, MOS 温度与故障码
+  *                      必须显式置 0 或 INT8_MIN, 不得保留未定义值. ISR-safe.
   */
 typedef struct
 {

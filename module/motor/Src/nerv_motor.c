@@ -668,7 +668,7 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->fb.temperature_c          = 0;
     self->measurement.angle_rad     = 0.0f;
     self->measurement.speed_radps   = 0.0f;
-    self->measurement.current       = 0.0f;
+    self->measurement.torque_n_m    = 0.0f;
     self->measurement.temperature_c = 0;
     self->geo.tx_id                 = 0U;
     self->geo.rx_id                 = 0U;
@@ -742,6 +742,11 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
     }
 
     if (0U == model->angle_count)
+    {
+        return NERV_ERROR;
+    }
+
+    if (!isfinite(model->rated_gear_ratio) || (model->rated_gear_ratio <= 0.0f))
     {
         return NERV_ERROR;
     }
@@ -834,8 +839,17 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
 
     measurement->angle_rad =
         NERV_Math_Wrap(fb->angle_rad / config->gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
-    measurement->speed_radps   = fb->speed_radps / config->gear_ratio * sign;
-    measurement->current       = fb->current_a * sign;
+    measurement->speed_radps = fb->speed_radps / config->gear_ratio * sign;
+    if (config->driver->model->fb_torque_present)
+    {
+        measurement->torque_n_m = fb->torque_n_m * config->gear_ratio * sign;
+    }
+    else
+    {
+        measurement->torque_n_m = fb->current_a * config->driver->model->torque_constant_n_m_per_a *
+                                  config->gear_ratio / config->driver->model->rated_gear_ratio *
+                                  sign;
+    }
     measurement->temperature_c = fb->temperature_c;
 
     return NERV_OK;

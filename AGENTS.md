@@ -82,23 +82,20 @@ NERV/
 │   │   ├── Src/
 │   │   └── driver/
 │   │       ├── nerv_motor_driver.h
+│   │       ├── nerv_motor_driver.c
+│   │       ├── DM/
+│   │       │   └── nerv_motor_driver_dm.c
 │   │       └── DJI/
-│   │           └── nerv_motor_driver_dji.c
-│   ├── chassis/
-│   │   ├── Inc/
-│   │   └── Src/
-│   ├── gimbal/
-│   │   ├── Inc/
-│   │   └── Src/
-│   ├── shoot/
-│   │   ├── Inc/
-│   │   └── Src/
-│   └── safety/
+│   │           ├── nerv_motor_driver_dji.c
+│   │           └── nerv_motor_driver_dji.h
+│   └── chassis/
 │       ├── Inc/
 │       └── Src/
 └── scripts/
     └── check_style.py
 ```
+
+gimbal, shoot, safety 尚未实现, 其配置开关默认为 `NERV_DISABLE`, 目录在实现后再加入本树.
 
 规则:
 
@@ -169,7 +166,7 @@ config/       编译期平台选择与功能裁剪
 - 不包含任何 MCU 厂商头文件, 不包含 `bsp/<platform>/` 的头文件, 不包含 RTOS 头文件.
 - 通过 BSP 实例指针访问硬件, 不直接调用 HAL 或厂商库.
 - 对外接口使用 SI 单位与 `NERV_StatusTypeDef`.
-- 每个持有实例的模块提供带实例指针的 `GetError` 与 `ClearError`.
+- 每个持有实例的模块提供带实例指针的 `ReadError` 与 `ClearError`.
 
 ### 3.5 log
 
@@ -214,92 +211,36 @@ typedef enum
 
 ### 4.2 扩展错误码
 
-扩展错误码采用位掩码语义. 高 8 位为域号, 低 24 位为域内错误位. 域号使用 one-hot 编码, 多个域号可以按位或. 低 24 位按域分段, 每个子错误在整个低 24 位中占据唯一位置. 使用 `#define` 与固定宽度无符号整型, 不使用 `enum`, 因为调用者需要对错误位做按位或.
+错误位采用掩码语义, 在 24 位内全局唯一, 不划分域号. 错误码只表达实例的运行期状态, 调用期错误由返回值表达, 不进入错误位. 模块的 `ReadError` 直接返回实例保存的错误位, 调用方按位判断. 使用 `#define` 与固定宽度无符号整型, 不使用 `enum`, 因为调用者需要对错误位做按位或.
 
-| 域 | 域号 | 低 24 位范围 | 域掩码 |
-| --- | --- | --- | --- |
-| 公共 | `NERV_ERR_BIT(0)` | bit 0..5 | `NERV_ERR_COMMON_BITS_MASK` |
-| FDCAN | `NERV_ERR_BIT(1)` | bit 6..8 | `NERV_ERR_FDCAN_BITS_MASK` |
-| 电机 | `NERV_ERR_BIT(2)` | bit 9..10 | `NERV_ERR_MOTOR_BITS_MASK` |
-| 底盘 | `NERV_ERR_BIT(3)` | bit 11..12 | `NERV_ERR_CHASSIS_BITS_MASK` |
-| 云台 | `NERV_ERR_BIT(4)` | bit 13..14 | `NERV_ERR_GIMBAL_BITS_MASK` |
-| 发射 | `NERV_ERR_BIT(5)` | bit 15..16 | `NERV_ERR_SHOOT_BITS_MASK` |
-| 安全 | `NERV_ERR_BIT(6)` | bit 17..18 | `NERV_ERR_SAFETY_BITS_MASK` |
+| 模块 | 位范围        | 掩码                         |
+| ---- | ------------- | ---------------------------- |
+| 预留 | bit 0..8      | 无                           |
+| 电机 | bit 9..10, 20 | `NERV_ERR_MOTOR_BITS_MASK`   |
+| 底盘 | bit 11..12    | `NERV_ERR_CHASSIS_BITS_MASK` |
+| 云台 | bit 13..14    | `NERV_ERR_GIMBAL_BITS_MASK`  |
+| 发射 | bit 15..16    | `NERV_ERR_SHOOT_BITS_MASK`   |
+| 安全 | bit 17..18    | `NERV_ERR_SAFETY_BITS_MASK`  |
 
-bit 19..23 为预留位. 扩展现有域时优先从预留位分配, 把新位并入对应域的 `NERV_ERR_<DOMAIN>_BITS_MASK`, 不移动已有错误位. 预留位用尽时才重新分配并同步升级遥测协议版本.
+bit 0..8, 19, 21..23 为预留位. 扩展时优先从预留位分配, 把新位并入对应模块的 `NERV_ERR_<MODULE>_BITS_MASK`, 不移动已有错误位.
 
-错误码直接使用 `NERV_ERR_BIT(全局位号)`, 不引入域内偏移辅助宏. 域号同样直接使用 `NERV_ERR_BIT(域内位号)`, 显式写出置位的是哪一位, 位号即域编号字节 (高 8 位) 中的位置. 域掩码也用 `NERV_ERR_BIT` 显式组合, 使每个错误码的位号可以直接核对.
+错误码名称保留模块名, 形如 `NERV_ERR_<MODULE>_<CONTENT>`. 错误码直接使用 `NERV_ERR_BIT(全局位号)`, 掩码也用 `NERV_ERR_BIT` 显式组合, 使每个错误码的位号可以直接核对.
 
 ```c
 #define NERV_ERR_NONE 0x00000000U
 #define NERV_ERR_ALL  0xFFFFFFFFU
 #define NERV_ERR_BITS_MASK 0x00FFFFFFU
 
-#define NERV_ERR_DOMAIN(_domain) ((uint32_t)(_domain) << 24U)
-#define NERV_ERR_BIT(_bit)       ((uint32_t)1U << (_bit))
+#define NERV_ERR_BIT(_bit) ((uint32_t)1U << (_bit))
 
-/* 域号用 NERV_ERR_BIT 显式写出置位位号, 位号即域编号字节中的位置. */
-#define NERV_ERR_DOMAIN_COMMON  NERV_ERR_BIT(0U)
-#define NERV_ERR_DOMAIN_FDCAN   NERV_ERR_BIT(1U)
-#define NERV_ERR_DOMAIN_MOTOR   NERV_ERR_BIT(2U)
-#define NERV_ERR_DOMAIN_CHASSIS NERV_ERR_BIT(3U)
-#define NERV_ERR_DOMAIN_GIMBAL  NERV_ERR_BIT(4U)
-#define NERV_ERR_DOMAIN_SHOOT   NERV_ERR_BIT(5U)
-#define NERV_ERR_DOMAIN_SAFETY  NERV_ERR_BIT(6U)
+#define NERV_ERR_MOTOR_OFFLINE      NERV_ERR_BIT(9U)
+#define NERV_ERR_CHASSIS_KINEMATICS NERV_ERR_BIT(11U)
 
-/* 域掩码用 NERV_ERR_BIT 显式组合, 例如: */
-#define NERV_ERR_FDCAN_BITS_MASK \
-    (NERV_ERR_BIT(6U) | NERV_ERR_BIT(7U) | NERV_ERR_BIT(8U))
-
-#define NERV_ERR_COMMON_INVALID_PARAM \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(0U))
-#define NERV_ERR_COMMON_NULL_PTR \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(1U))
-#define NERV_ERR_COMMON_NOT_INITIALIZED \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(2U))
-#define NERV_ERR_COMMON_NO_MEMORY \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(3U))
-#define NERV_ERR_COMMON_OUT_OF_RANGE \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(4U))
-#define NERV_ERR_COMMON_NOT_SUPPORTED \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_COMMON) | NERV_ERR_BIT(5U))
-
-#define NERV_ERR_FDCAN_FILTER \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(6U))
-#define NERV_ERR_FDCAN_TX_MAILBOX \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(7U))
-#define NERV_ERR_FDCAN_RX_OVERRUN \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_FDCAN) | NERV_ERR_BIT(8U))
-
-#define NERV_ERR_MOTOR_OFFLINE \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(9U))
-#define NERV_ERR_MOTOR_OVER_TEMP \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_MOTOR) | NERV_ERR_BIT(10U))
-
-#define NERV_ERR_CHASSIS_KINEMATICS \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(11U))
-#define NERV_ERR_CHASSIS_WHEEL_OFFLINE \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_CHASSIS) | NERV_ERR_BIT(12U))
-
-#define NERV_ERR_GIMBAL_LIMIT \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(13U))
-#define NERV_ERR_GIMBAL_OFFLINE \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_GIMBAL) | NERV_ERR_BIT(14U))
-
-#define NERV_ERR_SHOOT_JAM \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(15U))
-#define NERV_ERR_SHOOT_OFFLINE \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SHOOT) | NERV_ERR_BIT(16U))
-
-#define NERV_ERR_SAFETY_ESTOP \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(17U))
-#define NERV_ERR_SAFETY_LATCHED \
-    (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(18U))
+#define NERV_ERR_MOTOR_BITS_MASK \
+    (NERV_ERR_BIT(9U) | NERV_ERR_BIT(10U) | NERV_ERR_BIT(20U))
 ```
 
-模块实例只保存 `code & NERV_ERR_BITS_MASK`. `GetError` 用各域的 `NERV_ERR_<DOMAIN>_BITS_MASK` 判断哪些域非零, 再用 `NERV_ERR_DOMAIN(domain_mask)` 重建高 8 位. `ClearError` 用 `mask & NERV_ERR_BITS_MASK` 只清除低 24 位, 避免清除共享的域号字节.
-
-代码块只列名称与取值. `public/Inc/nerv_status.h` 中每个宏单独带一段文档块, 写明语义, 使任意宏都能被 `@ref` 引用. 参数的可选值列表按第 8.7 节书写.
+模块实例只保存错误位. `ReadError` 直接返回 `self->error & NERV_ERR_BITS_MASK`. `ClearError` 只清除 mask 中置位的错误位.
 
 ### 4.3 规则
 
@@ -307,64 +248,46 @@ bit 19..23 为预留位. 扩展现有域时优先从预留位分配, 把新位�
 - 持有实例的硬件模块必须提供:
 
 ```c
-uint32_t NERV_<Module>_GetError(const NERV_<Module>_InstanceTypeDef *self);
+uint32_t NERV_<Module>_ReadError(const NERV_<Module>_InstanceTypeDef *self);
 void     NERV_<Module>_ClearError(NERV_<Module>_InstanceTypeDef *self, uint32_t mask);
 ```
 
-- `GetError` 返回粘滞位掩码, `0U` 表示无错误. 读取本身不清除错误.
-- `ClearError` 只清除 `mask` 中置位的错误. `NERV_ERR_ALL` 只用于清除, 不作为 `GetError` 的返回值.
+- `ReadError` 返回粘滞位掩码, `0U` 表示无错误. 读取本身不清除错误.
+- `ClearError` 只清除 `mask` 中置位的错误. `NERV_ERR_ALL` 只用于清除, 不作为 `ReadError` 的返回值.
 - `ClearError` 不处理 `NERV_ERR_SAFETY_ESTOP`. 该位只由 `NERV_Safety_ClearEStop` 清除, 避免全清操作绕过急停保护.
 - 错误位在中断中置位, 在任务中清除时必须使用临界区或原子位操作.
 - 错误码集中定义在 `public/Inc/nerv_status.h`. 禁止在模块头文件中散落定义.
-- 域号宏 `NERV_ERR_DOMAIN_<DOMAIN>` 必须 one-hot. 低 24 位的子错误位必须在全局范围内唯一, 不允许不同域复用同一低位.
-- 错误码定义直接写出 `NERV_ERR_BIT(全局位号)`, 域号定义直接写出 `NERV_ERR_BIT(域内位号)`, 不引入 `NERV_ERR_<DOMAIN>_BIT_OFFSET` 或 `NERV_ERR_<DOMAIN>_BIT(_bit)` 这类隐藏偏移的辅助宏. 域掩码也使用 `NERV_ERR_BIT` 显式组合.
-- 模块实例的错误寄存器只保存 `code & NERV_ERR_BITS_MASK`. 置位与清除按以下模式实现:
+- 错误位必须在全局范围内唯一, 不允许不同模块复用同一位.
+- 错误码定义直接写出 `NERV_ERR_BIT(全局位号)`, 不引入 `NERV_ERR_<MODULE>_BIT_OFFSET` 或 `NERV_ERR_<MODULE>_BIT(_bit)` 这类隐藏偏移的辅助宏. 模块掩码也使用 `NERV_ERR_BIT` 显式组合.
+- 模块实例的错误寄存器只保存错误位. 置位与清除按以下模式实现:
 
 ```c
 self->error |= (code & NERV_ERR_BITS_MASK);
 self->error &= ~(mask & NERV_ERR_BITS_MASK);
 ```
 
-- `GetError` 根据低 24 位重建高 8 位域号:
+- `ReadError` 直接返回错误位, 不重建域号:
 
 ```c
-uint32_t NERV_Example_GetError(const NERV_Example_InstanceTypeDef *self)
+uint32_t NERV_Example_ReadError(const NERV_Example_InstanceTypeDef *self)
 {
-    uint32_t bits;
-    uint32_t domain;
-
     if (NULL == self)
     {
         return NERV_ERR_NONE;
     }
 
-    bits = self->error & NERV_ERR_BITS_MASK;
-    domain = 0U;
-
-    if (0U != (bits & NERV_ERR_COMMON_BITS_MASK))
-    {
-        domain |= NERV_ERR_DOMAIN_COMMON;
-    }
-
-    if (0U != (bits & NERV_ERR_FDCAN_BITS_MASK))
-    {
-        domain |= NERV_ERR_DOMAIN_FDCAN;
-    }
-
-    /* 其他域同理. */
-
-    return NERV_ERR_DOMAIN(domain) | bits;
+    return self->error & NERV_ERR_BITS_MASK;
 }
 ```
 
-- 扩展现有域时优先使用 bit 19..23, 把新位并入该域的 `NERV_ERR_<DOMAIN>_BITS_MASK`, 不移动已有错误位. 预留位用尽时才重新分配并同步升级遥测协议版本.
-- 错误码名称统一为 `NERV_ERR_<DOMAIN>_<CONTENT>`, 域名与具体内容之间用下划线连接. 域号宏 `NERV_ERR_DOMAIN_<DOMAIN>` 是例外, 它表示域编号本身, 不是错误码.
+- 扩展现有模块时优先使用预留位 bit 19, 21..23, 把新位并入该模块的 `NERV_ERR_<MODULE>_BITS_MASK`, 不移动已有错误位. 预留位用尽时才重新分配并同步升级遥测协议版本.
+- 错误码名称: 通用错误码不加模块名, 形如 `NERV_ERR_<CONTENT>`; 模块专属错误码形如 `NERV_ERR_<MODULE>_<CONTENT>`.
 - 全局服务模块, 例如日志模块, 通过返回值报告错误, 不提供实例错误寄存器.
-- `config/Src/config_check.c` 使用 `_Static_assert` 检查域号 one-hot, 各域低位掩码与错误码位号.
+- `config/Src/config_check.c` 使用 `_Static_assert` 检查各模块掩码与错误码位号.
 
 ```c
-_Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
-               "common error bits must be distinct.");
+_Static_assert(NERV_ERR_MOTOR_OFFLINE != NERV_ERR_MOTOR_OVER_TEMP,
+               "motor error bits must be distinct.");
 ```
 
 ---
@@ -375,19 +298,19 @@ _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
 
 所有模块内部计算与对外接口使用 SI 单位. 仅在 BSP 或电机协议边界做单位转换.
 
-| 物理量 | 单位 | 变量后缀 | 示例 |
-| --- | --- | --- | --- |
-| 长度 | m | `_m` | `wheel_radius_m` |
-| 角度 | rad | `_rad` | `yaw_rad` |
-| 线速度 | m/s | `_mps` | `vx_mps` |
-| 角速度 | rad/s | `_radps` | `wz_radps` |
-| 加速度 | m/s² | `_mps2` | `ax_mps2` |
-| 电流 | A | `_a` | `current_a` |
-| 电压 | V | `_v` | `voltage_v` |
-| 力矩 | N·m | `_n_m` | `torque_n_m` |
-| 时间 | s 或 ms 或 us | `_s` 或 `_ms` 或 `_us` | `dt_s`, `timeout_ms` |
-| 温度 | ℃ | `_c` | `temp_c` |
-| 质量 | kg | `_kg` | `mass_kg` |
+| 物理量 | 单位          | 变量后缀               | 示例                 |
+| ------ | ------------- | ---------------------- | -------------------- |
+| 长度   | m             | `_m`                   | `wheel_radius_m`     |
+| 角度   | rad           | `_rad`                 | `yaw_rad`            |
+| 线速度 | m/s           | `_mps`                 | `vx_mps`             |
+| 角速度 | rad/s         | `_radps`               | `wz_radps`           |
+| 加速度 | m/s²          | `_mps2`                | `ax_mps2`            |
+| 电流   | A             | `_a`                   | `current_a`          |
+| 电压   | V             | `_v`                   | `voltage_v`          |
+| 力矩   | N·m           | `_n_m`                 | `torque_n_m`         |
+| 时间   | s 或 ms 或 us | `_s` 或 `_ms` 或 `_us` | `dt_s`, `timeout_ms` |
+| 温度   | ℃             | `_c`                   | `temp_c`             |
+| 质量   | kg            | `_kg`                  | `mass_kg`            |
 
 ### 5.2 坐标系
 
@@ -398,6 +321,7 @@ _Static_assert(NERV_ERR_COMMON_INVALID_PARAM != NERV_ERR_COMMON_NULL_PTR,
 - 位置与速度分属不同参考系. 位置在参考系中累积, 速度在机体系中表达, 与 ROS `nav_msgs/Odometry` 的 `pose` 与 `twist` 处理一致. 换算到参考系需要航向角, 由调用方完成.
 - 遥控器给出的底盘速度指令在云台系, 即操作手视角, 云台指向的方向为正前方. 它与底盘解算所用的机体系相差一个绕 z 轴的旋转, 角度为云台航向与底盘航向之差, 两个航向必须在同一参考系下测量.
 - 底盘接口只接受机体系速度. 遥控器指令到机体系的转换由调用方完成, 因为"底盘相对云台, 相对车体还是相对场地"是机器人级策略, 库不替使用者选定. 绕 z 轴的角速度不随参考系改变, 转换时原样传递.
+- 底盘控制链: 麦克纳姆轮与全向轮使用车体速度环串轮速环的串级速控, 正解算用于车体速度反馈, 逆解用于轮速目标, 调用方通过 `wheel_pid` 配置轮速环.
 - 姿态用欧拉角表示, 不采用 REP-103 推荐的旋转矩阵或四元数. 嵌入式控制需要直接的角度值, 不做坐标变换.
 - 姿态结构体的每个字段必须在定义处用 `/**< ... */` 注明轴向与正方向.
 
@@ -427,25 +351,25 @@ float NERV_Utils_RadpsToRpm(float radps);
 
 所有对外符号必须携带 `NERV_` 前缀, 并按类别携带模块名, 公共域名或配置域前缀, 防止与 HAL, 中间件或其他库冲突.
 
-| 类别 | 规则 | 示例 |
-| --- | --- | --- |
-| 公开函数 | `NERV_<Module>_<Verb><Noun>` | `NERV_Chassis_Init` |
-| 公共工具函数 | `NERV_Math_`, `NERV_Utils_`, `NERV_Ptr_` | `NERV_Math_Wrap`, `NERV_Utils_RpmToRadps` |
-| 公共工具宏 | `NERV_UTILS_<NAME>`, 仅限 `public/Inc/nerv_utils.h` | `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS` |
-| 公共数学常量 | `NERV_MATH_<NAME>`, 仅限 `public/Inc/nerv_math.h` | `NERV_MATH_PI`, `NERV_MATH_TWO_PI` |
-| 初始化与注册 | `NERV_<Module>_Register`, 首参数为实例指针 | `NERV_Chassis_Register` |
-| 实例类型 | `NERV_<Module>_InstanceTypeDef` | `NERV_Chassis_InstanceTypeDef` |
-| 配置类型 | `NERV_<Module>_ConfigTypeDef` | `NERV_Chassis_ConfigTypeDef` |
-| 枚举类型 | `NERV_<Module>_<Name>TypeDef` | `NERV_Chassis_KindTypeDef` |
-| 枚举成员 | `NERV_<MODULE>_<NAME>`, 必须显式赋值 | `NERV_CHASSIS_TYPE_MECANUM = 1U` |
-| 回调类型 | `NERV_<Module>_<Event>CallbackTypeDef` | `NERV_Chassis_FaultCallbackTypeDef` |
-| 位掩码与宏常量 | `NERV_<MODULE>_<NAME>` | `NERV_ERR_COMMON_INVALID_PARAM` |
-| 用户可覆盖的默认值宏 | `NERV_<MODULE>_<NAME>`, 用 `#ifndef` 包裹 | `NERV_MOTOR_MAX_CURRENT_MA` |
-| 用户禁止覆盖的推导宏 | `NERV_<MODULE>_<NAME>`, 用 `#if defined(...)` 与 `#error` 保护 | `NERV_CHASSIS_WHEEL_COUNT` |
-| 内部实现宏 | `__NERV_<MODULE>_<NAME>`, 仅限 `*_priv.h` 或 `.c` | `__NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT` |
-| 内部函数 | `static` 修饰, 仍使用 `NERV_` 前缀 | `static void NERV_Chassis_UpdateOdometry(...)` |
-| 内部变量 | 小写下划线, 带单位后缀 | `chassis_cfg`, `speed_radps`, `dt_s` |
-| 函数指针成员 | 动词开头, 语义简短 | `init`, `update`, `set_ref` |
+| 类别                 | 规则                                                           | 示例                                             |
+| -------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| 公开函数             | `NERV_<Module>_<Verb><Noun>`                                   | `NERV_Chassis_Init`                              |
+| 公共工具函数         | `NERV_Math_`, `NERV_Utils_`, `NERV_Ptr_`                       | `NERV_Math_Wrap`, `NERV_Utils_RpmToRadps`        |
+| 公共工具宏           | `NERV_UTILS_<NAME>`, 仅限 `public/Inc/nerv_utils.h`            | `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS` |
+| 公共数学常量         | `NERV_MATH_<NAME>`, 仅限 `public/Inc/nerv_math.h`              | `NERV_MATH_PI`, `NERV_MATH_TWO_PI`               |
+| 初始化与注册         | `NERV_<Module>_Register`, 首参数为实例指针                     | `NERV_Chassis_Register`                          |
+| 实例类型             | `NERV_<Module>_InstanceTypeDef`                                | `NERV_Chassis_InstanceTypeDef`                   |
+| 配置类型             | `NERV_<Module>_ConfigTypeDef`                                  | `NERV_Chassis_ConfigTypeDef`                     |
+| 枚举类型             | `NERV_<Module>_<Name>TypeDef`                                  | `NERV_Chassis_KindTypeDef`                       |
+| 枚举成员             | `NERV_<MODULE>_<NAME>`, 必须显式赋值                           | `NERV_CHASSIS_TYPE_MECANUM = 1U`                 |
+| 回调类型             | `NERV_<Module>_<Event>CallbackTypeDef`                         | `NERV_Chassis_FaultCallbackTypeDef`              |
+| 位掩码与宏常量       | `NERV_<MODULE>_<NAME>`                                         | `NERV_ERR_MOTOR_OFFLINE`                         |
+| 用户可覆盖的默认值宏 | `NERV_<MODULE>_<NAME>`, 用 `#ifndef` 包裹                      | `NERV_MOTOR_MAX_CURRENT_MA`                      |
+| 用户禁止覆盖的推导宏 | `NERV_<MODULE>_<NAME>`, 用 `#if defined(...)` 与 `#error` 保护 | `NERV_CHASSIS_WHEEL_COUNT`                       |
+| 内部实现宏           | `__NERV_<MODULE>_<NAME>`, 仅限 `*_priv.h` 或 `.c`              | `__NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT`        |
+| 内部函数             | `static` 修饰, 仍使用 `NERV_` 前缀                             | `static void NERV_Chassis_UpdateOdometry(...)`   |
+| 内部变量             | 小写下划线, 带单位后缀                                         | `chassis_cfg`, `speed_radps`, `dt_s`             |
+| 函数指针成员         | 动词开头, 语义简短                                             | `init`, `update`, `set_ref`                      |
 
 规则:
 
@@ -460,14 +384,14 @@ float NERV_Utils_RadpsToRpm(float radps);
 
 控制语境下两类不同概念使用固定术语, 命名与文档不得混用:
 
-| 概念 | 中文术语 | 英文术语 | 命名示例 |
-| --- | --- | --- | --- |
-| 目标值与实际值之差, 控制的连续输入 | 偏差 | deviation | `speed_deviation_radps`, `translate_prev_deviation` |
-| 系统异常, 需要处置的离散事件 | 错误 | error | `self->error`, `NERV_ERR_MOTOR_OFFLINE`, `NERV_Motor_GetError` |
+| 概念                               | 中文术语 | 英文术语  | 命名示例                                                        |
+| ---------------------------------- | -------- | --------- | --------------------------------------------------------------- |
+| 目标值与实际值之差, 控制的连续输入 | 偏差     | deviation | `speed_deviation_radps`, `translate_prev_deviation`             |
+| 系统异常, 需要处置的离散事件       | 错误     | error     | `self->error`, `NERV_ERR_MOTOR_OFFLINE`, `NERV_Motor_ReadError` |
 
 规则:
 
-- 错误码与错误寄存器体系统一使用 error, 已固化在 `public/Inc/nerv_status.h` 与各模块的 `GetError`, `ClearError` 接口, 不再改动.
+- 错误码与错误寄存器体系统一使用 error, 已固化在 `public/Inc/nerv_status.h` 与各模块的 `ReadError`, `ClearError` 接口, 不再改动.
 - 控制模块中设定值与测量值之差一律使用 deviation, 不得使用 error, offset (该词专指稳态余差), delta 或 gap.
 - 文档与注释中, 描述控制偏差写"偏差", 描述故障体系写"错误", 两个词不互换.
 - 数值精度问题 (舍入, 浮点容差) 不属于以上两类, 注释写"舍入"或"数值精度".
@@ -578,15 +502,15 @@ NERV_FDCAN_Transmit(hfdcan, data, frame_len,
 
 ```c
 /* 反例 */
-#define NERV_MOTOR_CMD_ENABLE   0x01U
-#define NERV_MOTOR_CMD_DISABLE  0x02U
+#define NERV_MOTOR_CONTROL_ENABLE   0x01U
+#define NERV_MOTOR_CONTROL_DISABLE  0x02U
 
 /* 正例 */
 typedef enum
 {
-    NERV_MOTOR_CMD_ENABLE  = 0x01U,  /**< 使能电机 */
-    NERV_MOTOR_CMD_DISABLE = 0x02U,  /**< 失能电机 */
-} NERV_Motor_CmdTypeDef;
+    NERV_MOTOR_CONTROL_ENABLE  = 0x01U,  /**< 使能电机 */
+    NERV_MOTOR_CONTROL_DISABLE = 0x02U,  /**< 失能电机 */
+} NERV_Motor_ControlTypeDef;
 ```
 
 ### 7.6 宏与枚举镜像
@@ -602,16 +526,14 @@ typedef enum
 
 ```c
 /* config/Inc/config.h */
-#define NERV_CHASSIS_TYPE_MECANUM   1U
-#define NERV_CHASSIS_TYPE_OMNI      2U
-#define NERV_CHASSIS_TYPE_STEERING  3U
+#define NERV_CHASSIS_TYPE_MECANUM 1U
+#define NERV_CHASSIS_TYPE_OMNI    2U
 
 /* module/chassis/Inc/nerv_chassis.h */
 typedef enum
 {
-    NERV_CHASSIS_TYPE_MECANUM_RT  = 1U,  /**< 麦克纳姆轮 */
-    NERV_CHASSIS_TYPE_OMNI_RT     = 2U,  /**< 全向轮 */
-    NERV_CHASSIS_TYPE_STEERING_RT = 3U,  /**< 舵轮 */
+    NERV_CHASSIS_TYPE_MECANUM_RT = 1U, /**< 麦克纳姆轮 */
+    NERV_CHASSIS_TYPE_OMNI_RT    = 2U, /**< 全向轮 */
 } NERV_Chassis_KindTypeDef;
 
 /* module/chassis/Src/nerv_chassis.c */
@@ -619,8 +541,6 @@ _Static_assert((int)NERV_CHASSIS_TYPE_MECANUM == (int)NERV_CHASSIS_TYPE_MECANUM_
                "NERV_CHASSIS_TYPE_MECANUM and NERV_CHASSIS_TYPE_MECANUM_RT must be equal.");
 _Static_assert((int)NERV_CHASSIS_TYPE_OMNI == (int)NERV_CHASSIS_TYPE_OMNI_RT,
                "NERV_CHASSIS_TYPE_OMNI and NERV_CHASSIS_TYPE_OMNI_RT must be equal.");
-_Static_assert((int)NERV_CHASSIS_TYPE_STEERING == (int)NERV_CHASSIS_TYPE_STEERING_RT,
-               "NERV_CHASSIS_TYPE_STEERING and NERV_CHASSIS_TYPE_STEERING_RT must be equal.");
 ```
 
 编译期选择平台或构型时使用宏:
@@ -774,11 +694,11 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 #### 7.8.3 公开宏与内部宏
 
 - 公开宏使用 `NERV_<MODULE>_<NAME>`.
-- 内部宏使用 `__NERV_<MODULE>_<NAME>`, 仅允许出现在 `*_priv.h` 或 `.c` 中.
+- 内部宏使用 `__NERV_<MODULE>_<NAME>`, 仅允许出现在模块 `.c` 中.
 - 公开头文件不得暴露 `__NERV_` 宏.
 
 ```c
-/* module/motor/Inc/nerv_motor_priv.h */
+/* module/motor/Src/nerv_motor.c */
 #define __NERV_MOTOR_INTERNAL_MAX_CURRENT_MA  60000U
 ```
 
@@ -868,15 +788,22 @@ NERV_StatusTypeDef NERV_Chassis_RegisterFaultCallback(
 
 ### 8.1 注释内容
 
-注释只回答两类问题:
+注释回答两类问题:
 
 1. 设计原因, 约束, 硬件限制, 协议特殊要求.
 2. 调用者需要知道的信息: 合法取值, 前置条件, 副作用, 上下文安全性.
+
+注释只在这两种情况下写: 代码本身难以看出意图, 或读者需要快速获取大量信息. 代码已经直接表达意图时不写.
+
+禁止用注释描述与历史版本的差异. "改为", "不再", "新增", "原来", "之前" 这类措辞属于提交信息, 不属于代码注释.
+
+禁止用 "前置", "后置" 修饰声明或定义. 这类词既可读作动词也可读作形容词, 读者无法确定是描述位置还是描述动作. 声明就是声明, 定义就是定义.
 
 禁止用注释重复代码正在做什么. 如果代码必须靠注释才能看懂, 优先重构代码.
 
 ### 8.2 语言与标点
 
+- 注释是代码的一部分, 与代码同等对待. 注释错误与代码错误同级, 不允许以"只是注释"为由降低审查或验证标准.
 - 注释必须科学, 准确, 详细.
 - 禁止用 `+` 表示并列关系, 使用"与"或逗号.
 - 括号只承载技术符号, 例如函数名, 宏名, 数学表达式, 代码片段. 解释性内容写入主句.
@@ -989,24 +916,24 @@ NERV_StatusTypeDef NERV_Math_IsClose(float a, float b, float tolerance, bool *is
 
 #### 8.4.3 选择规则
 
-| 返回值 | 标签 |
-| --- | --- |
-| 有限个命名取值, 例如 `NERV_StatusTypeDef` 或枚举 | `@retval`, 每个取值一条 |
-| 数值, 范围, 位掩码 | `@return` |
-| 指针, 结构体, 句柄 | `@return` |
-| 状态码与输出参数 | `@retval` 描述状态, `@param[out]` 描述结果 |
+| 返回值                                           | 标签                                       |
+| ------------------------------------------------ | ------------------------------------------ |
+| 有限个命名取值, 例如 `NERV_StatusTypeDef` 或枚举 | `@retval`, 每个取值一条                    |
+| 数值, 范围, 位掩码                               | `@return`                                  |
+| 指针, 结构体, 句柄                               | `@return`                                  |
+| 状态码与输出参数                                 | `@retval` 描述状态, `@param[out]` 描述结果 |
 
 Doxygen 生成文档时, `@retval` 条目渲染为返回值表格, `@return` 渲染为一段说明. 同一函数不同时使用两者.
 
 #### 8.4.4 其他常用标签
 
-| 标签 | 用途 |
-| --- | --- |
-| `@brief` | 一句话描述 |
-| `@param[in]`, `@param[out]`, `@param[in,out]` | 参数方向 |
-| `@note` | 上下文, 合法取值, 线程安全性 |
-| `@warning` | 未定义行为或硬件风险 |
-| `@see` | 关联函数, 类型或宏 |
+| 标签                                          | 用途                         |
+| --------------------------------------------- | ---------------------------- |
+| `@brief`                                      | 一句话描述                   |
+| `@param[in]`, `@param[out]`, `@param[in,out]` | 参数方向                     |
+| `@note`                                       | 上下文, 合法取值, 线程安全性 |
+| `@warning`                                    | 未定义行为或硬件风险         |
+| `@see`                                        | 关联函数, 类型或宏           |
 
 ### 8.5 行内注释
 
@@ -1063,49 +990,18 @@ Python 脚本模板:
 
 参数有有限个可选值时, 在 `@param` 中用 `@arg` 逐条列出, 值的引用用 `@ref`. 与 ST HAL 的写法一致.
 
+````c
 ```c
 /**
-  * @brief  由域号生成错误码的域号段.
-  * @param  _domain 域号, 可取以下值.
-  *                @arg @ref NERV_ERR_DOMAIN_COMMON 公共域.
-  *                @arg @ref NERV_ERR_DOMAIN_FDCAN FDCAN 域.
-  * @return 域号位于高 8 位, 低 24 位为 0 的掩码.
+  * @brief  运行期切换控制模式.
+  * @param  mode 目标控制模式, 可取以下值.
+  *                @arg @ref NERV_MOTOR_CONTROL_SCALAR 单标量模式.
+  *                @arg @ref NERV_MOTOR_CONTROL_MIT MIT 模式.
+  *                @arg @ref NERV_MOTOR_CONTROL_POSITION_VELOCITY 位置速度模式.
   */
-#define NERV_ERR_DOMAIN(_domain) ((uint32_t)(_domain) << 24U)
-```
-
-规则:
-
-- 只用 `@ref` 引用已登记的符号. 不用 `@group`, `@group` 用于组织文档分组, 不能引用取值.
-- 被 `@ref` 引用的宏必须自己带文档块. 多个宏共用一个文档块时, Doxygen 只登记块后紧邻的那一个, 其余引用会报 `unable to resolve reference`.
-- 列表项的说明写清语义, 不重复宏名.
-- 取值是枚举类型时, 直接引用类型, 例如 `This parameter can be a value of @ref SPI_Mode`.
-- 掩码类宏的 `@brief` 写明产出的是掩码, `@return` 描述结果. 不写"生成错误位"这类会被理解成产生具体错误的措辞.
-
----
-
-## 9. 面向对象与实例
-
-### 9.1 实例封装
-
-数据与操作放在同一结构体中. 对外函数把实例指针作为第一个参数, 模拟 `this`.
-
-```c
-typedef struct NERV_Chassis_Instance
-{
-    NERV_Chassis_ConfigTypeDef config;  /**< 配置, 由 Register 绑定 */
-
-    NERV_StatusTypeDef (*init)(struct NERV_Chassis_Instance *self);
-    NERV_StatusTypeDef (*update)(
-        struct NERV_Chassis_Instance *self,
-        const NERV_Chassis_VelocityTypeDef *target);
-    void (*get_odometry)(
-        const struct NERV_Chassis_Instance *self,
-        NERV_Chassis_OdometryTypeDef *odom);
-
-    void *platform_data;  /**< 指向调用者提供的静态平台数据 */
-} NERV_Chassis_InstanceTypeDef;
-```
+NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
+                                      NERV_Motor_ControlKindTypeDef mode);
+````
 
 规则:
 
@@ -1147,11 +1043,11 @@ NERV_StatusTypeDef NERV_Chassis_Register(
 
 ### 9.5 扩展点选择
 
-| 机制 | 适用场景 | 使用方式 |
-| --- | --- | --- |
-| 注册回调 | 运行期可变的, 多实例的, 与实例绑定的通知 | `NERV_<Module>_Register<Event>Callback` |
-| 编译期函数指针 | 固件构建时确定的实现选择 | `config.h` 宏与 `#if` |
-| 配置结构体 | 静态参数 | `NERV_<Module>_ConfigTypeDef` |
+| 机制           | 适用场景                                 | 使用方式                                |
+| -------------- | ---------------------------------------- | --------------------------------------- |
+| 注册回调       | 运行期可变的, 多实例的, 与实例绑定的通知 | `NERV_<Module>_Register<Event>Callback` |
+| 编译期函数指针 | 固件构建时确定的实现选择                 | `config.h` 宏与 `#if`                   |
+| 配置结构体     | 静态参数                                 | `NERV_<Module>_ConfigTypeDef`           |
 
 模块扩展点不使用弱符号. BSP 对接 HAL 的 weak 回调除外. 同一扩展点只选择一种机制.
 
@@ -1593,11 +1489,11 @@ NERV_StatusTypeDef NERV_Log_Printf(NERV_Log_LevelTypeDef level,
 
 每个对外接口必须在契约中标注以下一种线程模型:
 
-| 标注 | 含义 |
-| --- | --- |
-| `ISR-safe` | 可以在中断上下文调用, 不阻塞, 不分配内存, 不调用日志 |
-| `NOT ISR-safe` | 只能在任务或主循环上下文调用 |
-| `caller-synchronized` | 库内部不加锁, 调用者必须保证同一实例不被并发访问 |
+| 标注                  | 含义                                                 |
+| --------------------- | ---------------------------------------------------- |
+| `ISR-safe`            | 可以在中断上下文调用, 不阻塞, 不分配内存, 不调用日志 |
+| `NOT ISR-safe`        | 只能在任务或主循环上下文调用                         |
+| `caller-synchronized` | 库内部不加锁, 调用者必须保证同一实例不被并发访问     |
 
 默认模型是 `NOT ISR-safe` 与 `caller-synchronized`. 只有明确标注 `ISR-safe` 的函数才能在中断中调用.
 
@@ -1737,7 +1633,7 @@ NERV_StatusTypeDef NERV_FDCAN_RegisterRxCallback(
     NERV_FDCAN_RxCallbackTypeDef callback,
     void *user);
 
-uint32_t NERV_FDCAN_GetError(const NERV_FDCAN_InstanceTypeDef *self);
+uint32_t NERV_FDCAN_ReadError(const NERV_FDCAN_InstanceTypeDef *self);
 void NERV_FDCAN_ClearError(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
 
 void NERV_FDCAN_OnRx(
@@ -1751,7 +1647,7 @@ void NERV_FDCAN_OnRx(
 - `NERV_FDCAN_ConfigureFilter` 必须在 `NERV_FDCAN_Start` 之前调用.
 - `NERV_FDCAN_Transmit` 非阻塞. 没有空闲发送邮箱时返回 `NERV_BUSY`.
 - `NERV_FDCAN_OnRx` 由平台适配层在接收中断中调用. 它只复制回调指针并通知, 不阻塞, 不分配内存, 不调用日志.
-- `NERV_FDCAN_GetError` 返回粘滞位掩码. `NERV_FDCAN_ClearError` 只清除 `mask` 中置位的错误.
+- `NERV_FDCAN_ReadError` 返回粘滞位掩码. `NERV_FDCAN_ClearError` 只清除 `mask` 中置位的错误.
 - 回调的上下文由注册函数契约写明. 若在中断中调用, 回调必须是 `ISR-safe`.
 
 ### 13.3 帧与过滤器规则
@@ -2082,7 +1978,7 @@ NERV_StatusTypeDef NERV_Safety_Init(NERV_Safety_InstanceTypeDef *self);
 void NERV_Safety_TriggerEStop(NERV_Safety_InstanceTypeDef *self, uint32_t reason);
 NERV_StatusTypeDef NERV_Safety_ClearEStop(NERV_Safety_InstanceTypeDef *self);
 bool NERV_Safety_IsEStopActive(const NERV_Safety_InstanceTypeDef *self);
-uint32_t NERV_Safety_GetError(const NERV_Safety_InstanceTypeDef *self);
+uint32_t NERV_Safety_ReadError(const NERV_Safety_InstanceTypeDef *self);
 void NERV_Safety_ClearError(NERV_Safety_InstanceTypeDef *self, uint32_t mask);
 ```
 
@@ -2093,7 +1989,7 @@ void NERV_Safety_ClearError(NERV_Safety_InstanceTypeDef *self, uint32_t mask);
 - `ClearEStop` 必须由任务上下文显式调用, 并满足使用者的复位条件.
 - `ClearEStop` 不得清除硬件急停输入仍然有效的状态.
 - 急停原因必须保留到显式清除.
-- `NERV_Safety_GetError` 返回粘滞位掩码.
+- `NERV_Safety_ReadError` 返回粘滞位掩码.
 
 ### 17.4 执行器安全状态
 
@@ -2190,14 +2086,14 @@ git diff --check
 提交信息使用 Conventional Commits:
 
 ```text
-<type>(<scope>): <subject>
+<type>(<scope>): <description>
 
 <body>
 ```
 
 - `type` 使用小写英文: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`.
 - `scope` 使用小写英文: 模块名, `public`, `config`, `bsp`, `log`, `status`, `type`, `macro`, `docs`, `layout`.
-- `subject` 使用英文, 不超过 72 个字符, 不以句号结尾.
+- `description` 使用中文, 不超过 72 个字符, 不以句号结尾.
 - `body` 使用中文, 说明原因, 影响范围与验证方式.
 - 禁止 emoji.
 - 禁止使用 `app`, `mdk`, `tests`, `ci`, `rtos` 作为 scope. 这些属于使用者工程.
@@ -2207,7 +2103,7 @@ git diff --check
 ### 19.2 示例
 
 ```text
-feat(fdcan): add MCU independent FDCAN interface
+feat(fdcan): 新增与 MCU 无关的 FDCAN 接口
 
 FDCAN 接口改为操作表与实例绑定, 平台适配层只依赖 bsp/Inc.
 模块层不再包含厂商 HAL 头文件.
@@ -2216,13 +2112,13 @@ FDCAN 接口改为操作表与实例绑定, 平台适配层只依赖 bsp/Inc.
 ```
 
 ```text
-refactor(module): remove RTOS dependency from control path
+refactor(module): 移除控制路径的 RTOS 依赖
 
 控制路径不再引用任何 RTOS 类型. 任务, 互斥量与周期由使用者负责.
 ```
 
 ```text
-docs(agents): define library-only repository boundary
+docs(agents): 明确仅库仓库的边界
 
 明确本库不包含 MDK-ARM, .ioc, Core, Drivers, 应用任务与测试工程.
 补充 FDCAN 作为唯一必需外设的移植约束.

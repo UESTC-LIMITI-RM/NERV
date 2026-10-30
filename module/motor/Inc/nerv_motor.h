@@ -59,9 +59,10 @@ typedef struct
   */
 typedef struct NERV_Motor_Measurement
 {
-    float angle_rad;      /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 范围 [0, 2π) */
-    float speed_radps;    /**< 输出轴角速度, 单位 rad/s, 机构正方向为正 */
-    float current;        /**< 实际输出电流, 单位 A, 不论电机型号, 机构正方向为正 */
+    float angle_rad;   /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 范围 [0, 2π) */
+    float speed_radps; /**< 输出轴角速度, 单位 rad/s, 机构正方向为正 */
+    float torque_n_m; /**< 输出轴转矩, 单位 N·m, 机构正方向为正. 型号不直接上报时由
+                               电流乘扭矩常数换算, 型号未提供扭矩常数时为 0 */
     int8_t temperature_c; /**< 电机温度, 单位 ℃ */
 } NERV_Motor_MeasurementTypeDef;
 

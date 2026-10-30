@@ -64,6 +64,9 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_MIT,
+    .torque_constant_n_m_per_a   = 1.2f,
+    .rated_gear_ratio            = 10.0f,
+    .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
     .control.profile.t_max_n_m   = 10.0f,
@@ -91,6 +94,9 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_SCALAR,
+    .torque_constant_n_m_per_a   = 1.2f,
+    .rated_gear_ratio            = 10.0f,
+    .fb_torque_present           = true,
     .scalar_quantity             = NERV_MOTOR_SCALAR_SPEED,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
@@ -119,6 +125,9 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_POSITION_VELOCITY,
+    .torque_constant_n_m_per_a   = 1.2f,
+    .rated_gear_ratio            = 10.0f,
+    .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
     .control.profile.t_max_n_m   = 10.0f,
@@ -505,7 +514,8 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
   * @note   帧为 8 字节标准帧, 标识符固定 0x7FF, 数据为
   *         device_id, 0x00, 0x55, 0x0A, mode, 0x00, 0x00, 0x00.
   * @note   切换流程建议: 先失能, 再写模式, 等待电机确认, 最后重新使能.
-  * @note   本函数只写运行期模式, 不保存到参数区; 需要掉电保持时另发保存帧.
+  * @warning 模式写入参数区并掉电保存. 参数区擦写寿命有限, 每个控制周期都调用会在
+  *          数分钟内耗尽寿命并损坏电机. 只能在初始化或模式变更时调用一次.
   */
 static NERV_StatusTypeDef NERV_Motor_Dm_SetMode(const NERV_FDCAN_InstanceTypeDef *bus,
                                                 const NERV_Motor_ModelTypeDef *model,

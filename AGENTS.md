@@ -123,6 +123,15 @@ include path 顺序:
 
 ---
 
+### 2.4 构建配置同步
+
+`CMakeLists.txt` 与 `compile_flags.txt` 是库的对外构建入口与编辑器解析入口. 新增, 删除或重命名源文件后, 必须在同一次改动里同步更新这两处:
+
+- `CMakeLists.txt` 的 `add_library` 源文件列表
+- `compile_flags.txt` 的 include 路径, 仅在新增或重命名目录时需要
+
+两者与实际文件不一致时, 使用者会编译失败, 或 clangd 解析报错, 且错误信息通常与真实原因无关.
+
 ## 3. 分层与依赖
 
 依赖方向只能向下:

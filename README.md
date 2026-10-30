@@ -9,8 +9,8 @@ NERV 负责电机控制, 底盘运动学, PID 调节与总线收发, 把硬件�
 - 统一电机接口, 所有类型的电机共用同一套 Init, SetControl, Update, OnRx 调用方式
 - 达妙 DM-J4310-2EC 支持 MIT, 位置速度, 速度三种控制模式
 - DJI M3508, M2006, GM6020 电流与电压模式
-- 底盘运动学支持全向轮, 麦克纳姆轮, 舵轮三种构型
-- 底盘集成里程计, 坡度前馈, 阻力前馈, 裁判系统功率限制
+- 底盘运动学支持全向轮与麦克纳姆轮两种构型
+- 底盘使用串级速控, 集成里程计与安全监督
 - FDCAN 总线抽象, 模块层不接触寄存器
 - 返回值与错误位两层诊断, 兼顾流程控制与故障定位
 - 全库 C11, 无动态内存, 无 RTOS 依赖
@@ -160,18 +160,21 @@ NERV_Motor_GetMeasurement(&dm_motor, &measurement);
 
 ## 支持的硬件
 
-| 类型 | 型号 | 控制模式 |
-| --- | --- | --- |
-| 达妙 | DM-J4310-2EC | MIT, 位置速度, 速度 |
-| DJI | M3508 配 C620 电调 | 电流 |
-| DJI | M2006 配 C610 电调 | 电流 |
-| DJI | GM6020 | 电流, 电压 |
+| 类型 | 型号               | 控制模式            |
+| ---- | ------------------ | ------------------- |
+| 达妙 | DM-J4310-2EC       | MIT, 位置速度, 速度 |
+| DJI  | M3508 配 C620 电调 | 电流                |
+| DJI  | M2006 配 C610 电调 | 电流                |
+| DJI  | GM6020             | 电流, 电压          |
 
 达妙驱动实例为 `NERV_Motor_Driver_DmMit`, `NERV_Motor_Driver_DmPositionVelocity`, `NERV_Motor_Driver_DmVelocity`.DJI 驱动实例为 `NERV_Motor_Driver_Dji3508`, `NERV_Motor_Driver_Dji2006`, `NERV_Motor_Driver_Dji6020Current`, `NERV_Motor_Driver_Dji6020Voltage`.
 
 ## 底盘
 
-底盘把四路电机组合成机构系速度, 负责运动学解算, 轮速闭环, 力分配与安全监督.
+底盘把四路电机组合成机构系速度, 负责运动学解算与安全监督.
+
+底盘使用串级速控: 目标速度经车体速度环修正, 逆解为各轮目标转速,
+再由每轮速度环输出电流.
 
 ```c
 #include "nerv_chassis.h"
@@ -190,15 +193,30 @@ NERV_Chassis_SetVelocity(&chassis, &velocity);
 NERV_Chassis_Update(&chassis, HAL_GetTick());
 ```
 
+配置里必须提供三个速度环:
+
+```c
+static const NERV_PID_ConfigTypeDef chassis_translate_pid = { ... };
+static const NERV_PID_ConfigTypeDef chassis_rotate_pid    = { ... };
+static const NERV_PID_ConfigTypeDef chassis_wheel_pid     = { ... };
+
+chassis_config.translate_pid = &chassis_translate_pid;
+chassis_config.rotate_pid    = &chassis_rotate_pid;
+chassis_config.wheel_pid     = &chassis_wheel_pid;
+```
+
+`translate_pid` 与 `rotate_pid` 是车体速度环, 输出速度修正量, 单位分别为 m/s 与 rad/s.
+`wheel_pid` 是轮速环, 输出电流, 单位 A.
+
 构型在 `config.h` 中选择:
 
 ```c
 #define NERV_CHASSIS_TYPE NERV_CHASSIS_TYPE_MECANUM
 ```
 
-可选 `NERV_CHASSIS_TYPE_OMNI`, `NERV_CHASSIS_TYPE_MECANUM`, `NERV_CHASSIS_TYPE_STEERING`.
+可选 `NERV_CHASSIS_TYPE_OMNI` 与 `NERV_CHASSIS_TYPE_MECANUM`.
 
-底盘还提供里程计, 坡度前馈, 阻力前馈与裁判系统功率限制, 对应开关为 `NERV_USE_CHASSIS_ODOMETRY`, `NERV_CHASSIS_USE_SLOPE_FEEDFORWARD`, `NERV_CHASSIS_USE_DRAG_FEEDFORWARD`, `NERV_CHASSIS_USE_POWER_LIMIT`.
+里程计开关为 `NERV_USE_CHASSIS_ODOMETRY`.
 
 ## 错误处理
 
@@ -235,17 +253,16 @@ NERV_Motor_ClearError(&motor, NERV_ERR_MOTOR_OFFLINE);
 
 ## 配置项
 
-| 宏 | 说明 | 默认值 |
-| --- | --- | --- |
-| `NERV_PLATFORM` | 目标平台 | `NERV_PLATFORM_NONE` |
-| `NERV_USE_MOTOR` | 电机模块开关 | `NERV_ENABLE` |
-| `NERV_USE_CHASSIS` | 底盘模块开关 | `NERV_ENABLE` |
-| `NERV_USE_LOG` | 日志模块开关 | `NERV_ENABLE` |
-| `NERV_USE_MOTOR_DM` | 达妙驱动开关 | `NERV_ENABLE` |
-| `NERV_USE_MOTOR_DJI` | DJI 驱动开关 | `NERV_ENABLE` |
-| `NERV_CHASSIS_TYPE` | 底盘构型 | `NERV_CHASSIS_TYPE_OMNI` |
-| `NERV_USE_CHASSIS_ODOMETRY` | 里程计开关 | `NERV_DISABLE` |
-| `NERV_CHASSIS_USE_POWER_LIMIT` | 功率限制开关 | `NERV_DISABLE` |
+| 宏                          | 说明         | 默认值                   |
+| --------------------------- | ------------ | ------------------------ |
+| `NERV_PLATFORM`             | 目标平台     | `NERV_PLATFORM_NONE`     |
+| `NERV_USE_MOTOR`            | 电机模块开关 | `NERV_ENABLE`            |
+| `NERV_USE_CHASSIS`          | 底盘模块开关 | `NERV_ENABLE`            |
+| `NERV_USE_LOG`              | 日志模块开关 | `NERV_ENABLE`            |
+| `NERV_USE_MOTOR_DM`         | 达妙驱动开关 | `NERV_ENABLE`            |
+| `NERV_USE_MOTOR_DJI`        | DJI 驱动开关 | `NERV_ENABLE`            |
+| `NERV_CHASSIS_TYPE`         | 底盘构型     | `NERV_CHASSIS_TYPE_OMNI` |
+| `NERV_USE_CHASSIS_ODOMETRY` | 里程计开关   | `NERV_DISABLE`           |
 
 完整列表与取值范围见 `config/Inc/config.h`, 编译期检查在 `config/Src/config_check.c`.
 

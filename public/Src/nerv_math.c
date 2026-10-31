@@ -132,14 +132,12 @@ float NERV_Math_Clamp(float value, float min_value, float max_value)
   */
 float NERV_Math_Deadband(float value, float threshold)
 {
-    float magnitude;
-
     if (threshold < 0.0f)
     {
         return value;
     }
 
-    magnitude = fabsf(value);
+    const float magnitude = fabsf(value);
 
     if (magnitude <= threshold)
     {
@@ -166,21 +164,15 @@ float NERV_Math_Deadband(float value, float threshold)
   */
 NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad)
 {
-    float cos_value;
-    float sin_value;
-    float new_vx;
-    float new_vy;
-
     if ((NULL == vx) || (NULL == vy))
     {
         return NERV_ERROR;
     }
 
-    cos_value = cosf(angle_rad);
-    sin_value = sinf(angle_rad);
-
-    new_vx = ((*vx) * cos_value) - ((*vy) * sin_value);
-    new_vy = ((*vx) * sin_value) + ((*vy) * cos_value);
+    const float cos_value = cosf(angle_rad);
+    const float sin_value = sinf(angle_rad);
+    const float new_vx    = ((*vx) * cos_value) - ((*vy) * sin_value);
+    const float new_vy    = ((*vx) * sin_value) + ((*vy) * cos_value);
 
     *vx = new_vx;
     *vy = new_vy;
@@ -201,13 +193,12 @@ NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad)
 static float NERV_Math_MatrixNorm3(const float *matrix)
 {
     float norm;
-    float row_sum;
 
     norm = 0.0f;
 
     for (uint8_t row = 0U; row < 3U; row++)
     {
-        row_sum =
+        const float row_sum =
             fabsf(matrix[row * 3U]) + fabsf(matrix[row * 3U + 1U]) + fabsf(matrix[row * 3U + 2U]);
 
         if (row_sum > norm)
@@ -249,22 +240,20 @@ static float NERV_Math_Det3(const float *matrix)
 NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs, float *solution)
 {
     float work[9];
-    float determinant;
-    float matrix_norm;
 
     if ((NULL == matrix) || (NULL == rhs) || (NULL == solution))
     {
         return NERV_ERROR;
     }
 
-    determinant = NERV_Math_Det3(matrix);
+    const float determinant = NERV_Math_Det3(matrix);
 
     if (!isfinite(determinant))
     {
         return NERV_ERROR;
     }
 
-    matrix_norm = NERV_Math_MatrixNorm3(matrix);
+    const float matrix_norm = NERV_Math_MatrixNorm3(matrix);
 
     if (fabsf(determinant) <=
         (__NERV_MATH_LINEAR3_SINGULAR_EPS * matrix_norm * matrix_norm * matrix_norm))

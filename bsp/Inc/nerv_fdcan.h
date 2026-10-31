@@ -246,9 +246,6 @@ static inline NERV_StatusTypeDef NERV_FDCAN_ConfigureFilter(NERV_FDCAN_InstanceT
 static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(const NERV_FDCAN_InstanceTypeDef *self,
                                                      const NERV_FDCAN_FrameTypeDef *frame)
 {
-    uint32_t id_limit;
-    uint8_t max_len;
-
     if ((NULL == self) || (NULL == frame))
     {
         return NERV_ERROR;
@@ -259,16 +256,18 @@ static inline NERV_StatusTypeDef NERV_FDCAN_Transmit(const NERV_FDCAN_InstanceTy
         return NERV_ERROR;
     }
 
-    max_len = (0U != (frame->flags & NERV_FDCAN_FLAG_FD)) ? NERV_FDCAN_DATA_MAX
-                                                          : NERV_FDCAN_CLASSIC_DATA_MAX;
+    const uint8_t max_len = (0U != (frame->flags & NERV_FDCAN_FLAG_FD))
+                                ? NERV_FDCAN_DATA_MAX
+                                : NERV_FDCAN_CLASSIC_DATA_MAX;
 
     if (frame->len > max_len)
     {
         return NERV_ERROR;
     }
 
-    id_limit = (0U != (frame->flags & NERV_FDCAN_FLAG_EXTENDED)) ? NERV_FDCAN_ID_EXTENDED_MAX
-                                                                 : NERV_FDCAN_ID_STANDARD_MAX;
+    const uint32_t id_limit = (0U != (frame->flags & NERV_FDCAN_FLAG_EXTENDED))
+                                  ? NERV_FDCAN_ID_EXTENDED_MAX
+                                  : NERV_FDCAN_ID_STANDARD_MAX;
 
     if (frame->id > id_limit)
     {
@@ -326,16 +325,13 @@ NERV_FDCAN_RegisterRxCallback(NERV_FDCAN_InstanceTypeDef *self,
 static inline void NERV_FDCAN_OnRx(NERV_FDCAN_InstanceTypeDef *self,
                                    const NERV_FDCAN_FrameTypeDef *frame)
 {
-    NERV_FDCAN_RxCallbackTypeDef callback;
-    void *user;
-
     if ((NULL == self) || (NULL == frame))
     {
         return;
     }
 
-    callback = self->rx_callback;
-    user     = self->rx_user;
+    const NERV_FDCAN_RxCallbackTypeDef callback = self->rx_callback;
+    void *const user                            = self->rx_user;
 
     if (NULL != callback)
     {

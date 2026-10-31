@@ -103,7 +103,7 @@ static NERV_StatusTypeDef NERV_Chassis_ValidateMotor(const NERV_Motor_InstanceTy
 
     model = driver->model;
 
-    if ((NERV_MOTOR_CONTROL_SCALAR != (NERV_Motor_ControlKindTypeDef)model->control_mode) ||
+    if ((NERV_MOTOR_CONTROL_SCALAR != model->control_mode) ||
         !(model->control.scalar.full_scale > __NERV_CHASSIS_MIN_SCALE) ||
         (model->control.scalar.cmd_limit <= 0))
     {
@@ -191,9 +191,7 @@ static void NERV_Chassis_RampVelocity(NERV_Chassis_InstanceTypeDef *self, float 
 static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceTypeDef *self,
                                                     NERV_Chassis_VelocityTypeDef *measured)
 {
-    const NERV_Chassis_ConfigTypeDef *config;
     float wheel_speed_radps[NERV_CHASSIS_WHEEL_COUNT];
-    float center_distance_m;
 
     if ((NULL == self) || (NULL == measured))
     {
@@ -205,7 +203,15 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceT
         wheel_speed_radps[index] = self->config.drive_motors[index]->measurement.speed_radps;
     }
 
-    config = &self->config;
+    const NERV_Chassis_ConfigTypeDef *config = &self->config;
+    float center_distance_m                  = 0.0f;
+
+#if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
+
+    center_distance_m = self->center_distance_m;
+
+#endif
+
     for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         if (!isfinite(wheel_speed_radps[index]))
@@ -246,7 +252,6 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceT
         float sum_direction_x;
         float sum_direction_y;
         float sum_lever;
-        float speed_mps;
 
         if (!(center_distance_m > 0.0f))
         {
@@ -259,7 +264,7 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceT
 
         for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
-            speed_mps = wheel_speed_radps[index] * config->wheel_radius_m;
+            const float speed_mps = wheel_speed_radps[index] * config->wheel_radius_m;
             sum_direction_x += speed_mps * (-wheel_sign_y[index]);
             sum_direction_y += speed_mps * wheel_sign_x[index];
             sum_lever += speed_mps * center_distance_m;
@@ -289,16 +294,13 @@ static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_Instan
                                                        const NERV_Chassis_VelocityTypeDef *command,
                                                        float *wheel_speed_radps)
 {
-    const NERV_Chassis_ConfigTypeDef *config;
-    float center_distance_m;
-
     if ((NULL == self) || (NULL == command) || (NULL == wheel_speed_radps))
     {
         return NERV_ERROR;
     }
 
-    config            = &self->config;
-    center_distance_m = 0.0f;
+    const NERV_Chassis_ConfigTypeDef *config = &self->config;
+    float center_distance_m                  = 0.0f;
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
 
@@ -362,7 +364,7 @@ static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_Instan
 
 /**
   * @brief  运行车体速度环, 输出带修正的目标速度.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @param  measured 当前机体系速度, 由正解算得出, 不得为 NULL.
   * @param  dt_s 控制间隔, 单位 s.
   * @param  command 输出修正后的目标速度, 不得为 NULL.
@@ -412,11 +414,9 @@ NERV_Chassis_ComputeVelocityCommand(NERV_Chassis_InstanceTypeDef *self,
   */
 static void NERV_Chassis_UpdateHealth(NERV_Chassis_InstanceTypeDef *self)
 {
-    uint32_t motor_error;
-
     for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
-        motor_error = NERV_Motor_ReadError(self->config.drive_motors[index]);
+        const uint32_t motor_error = NERV_Motor_ReadError(self->config.drive_motors[index]);
 
         if (0U != (motor_error & NERV_ERR_MOTOR_OFFLINE))
         {
@@ -626,10 +626,8 @@ NERV_StatusTypeDef NERV_Chassis_SetVelocity(NERV_Chassis_InstanceTypeDef *self,
   */
 NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint32_t now_ms)
 {
-    NERV_Motor_MeasurementTypeDef measurement;
     NERV_Chassis_VelocityTypeDef measured;
     NERV_Chassis_VelocityTypeDef velocity_command;
-    float wheel_speed_radps[NERV_CHASSIS_WHEEL_COUNT];
     float wheel_speed_target[NERV_CHASSIS_WHEEL_COUNT];
     float drive_current_a[NERV_CHASSIS_WHEEL_COUNT];
     float dt_s;
@@ -658,18 +656,6 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     NERV_Chassis_RampVelocity(self, dt_s);
 
-    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
-    {
-        if (NERV_OK == NERV_Motor_GetMeasurement(self->config.drive_motors[index], &measurement))
-        {
-            wheel_speed_radps[index] = measurement.speed_radps;
-        }
-        else
-        {
-            wheel_speed_radps[index] = 0.0f;
-        }
-    }
-
     ok = (NERV_OK == NERV_Chassis_SolveForward(self, &measured));
 
     if (ok)
@@ -687,9 +673,10 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     {
         for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
-            if (NERV_OK != NERV_PID_Update(&self->wheel_speed_pid[index], wheel_speed_target[index],
-                                           wheel_speed_radps[index], 0.0f, dt_s,
-                                           &drive_current_a[index]))
+            if (NERV_OK !=
+                NERV_PID_Update(&self->wheel_speed_pid[index], wheel_speed_target[index],
+                                self->config.drive_motors[index]->measurement.speed_radps, 0.0f,
+                                dt_s, &drive_current_a[index]))
             {
                 ok = false;
                 break;

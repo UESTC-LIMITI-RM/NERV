@@ -180,14 +180,12 @@ NERV_StatusTypeDef NERV_PID_Update(NERV_PID_InstanceTypeDef *self, float setpoin
 {
     float error;              /* 设定值与测量值之差, 与被控量同单位 */
     float p_term;             /* 比例项输出, 与 output 同单位 */
-    float raw_derivative;     /* 未滤波的微分项输出, 与 output 同单位 */
     float derivative_term;    /* 本周期实际使用的微分项输出, 与 output 同单位 */
     float integral_candidate; /* 积分项候选值, 计算后按积分限幅, 与 output 同单位 */
     float integral_delta;     /* 本周期新增的积分量, 与 output 同单位 */
     float integral_scale;     /* 变速积分增益, 无量纲, 范围 [0, 1] */
     float output_unsat;       /* 限幅前的输出, 与 output 同单位 */
     float output_final;       /* 限幅后的输出, 与 output 同单位 */
-    float alpha;              /* 微分项一阶低通系数, 无量纲, 范围 [0, 1] */
     bool saturated_high;      /* 限幅前输出高于 output_max */
     bool saturated_low;       /* 限幅前输出低于 output_min */
 
@@ -223,7 +221,8 @@ NERV_StatusTypeDef NERV_PID_Update(NERV_PID_InstanceTypeDef *self, float setpoin
 
     if (self->has_prev_measurement)
     {
-        raw_derivative = -self->config.kd * (measurement - self->prev_measurement) / dt_s;
+        const float raw_derivative =
+            -self->config.kd * (measurement - self->prev_measurement) / dt_s;
         if (!isfinite(raw_derivative))
         {
             return NERV_ERROR;
@@ -231,8 +230,8 @@ NERV_StatusTypeDef NERV_PID_Update(NERV_PID_InstanceTypeDef *self, float setpoin
 
         if (self->config.derivative_tau_s > 0.0f)
         {
-            alpha           = 1.0f / (1.0f + (dt_s / self->config.derivative_tau_s));
-            derivative_term = (alpha * self->derivative) + ((1.0f - alpha) * raw_derivative);
+            const float alpha = 1.0f / (1.0f + (dt_s / self->config.derivative_tau_s));
+            derivative_term   = (alpha * self->derivative) + ((1.0f - alpha) * raw_derivative);
         }
         else
         {

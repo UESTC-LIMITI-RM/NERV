@@ -57,10 +57,12 @@ NERV/
 │   │   ├── nerv_types.h
 │   │   ├── nerv_utils.h
 │   │   ├── nerv_math.h
+│   │   ├── nerv_pid.h
 │   │   └── nerv_log.h
 │   └── Src/
 │       ├── nerv_math.c
 │       ├── nerv_utils.c
+│       ├── nerv_pid.c
 │       └── nerv_log.c
 ├── config/
 │   ├── Inc/
@@ -737,7 +739,7 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 #if (NERV_CHASSIS_TYPE_MECANUM == NERV_CHASSIS_TYPE)
 #define NERV_CHASSIS_WHEEL_COUNT  4U
 #elif (NERV_CHASSIS_TYPE_OMNI == NERV_CHASSIS_TYPE)
-#define NERV_CHASSIS_WHEEL_COUNT  3U
+#define NERV_CHASSIS_WHEEL_COUNT  4U
 #else
 #error "Unsupported NERV_CHASSIS_TYPE."
 #endif
@@ -1012,7 +1014,28 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
                                       NERV_Motor_ControlKindTypeDef mode);
 ````
 
-规则:
+### 8.8 变量声明位置
+
+局部变量在函数或块的开头声明. 仅用作循环索引的变量直接在 `for` 语句内声明:
+
+```c
+for (uint8_t index = 0U; index < count; index++)
+{
+    ...
+}
+```
+
+不在 `for` 内声明非索引变量, 也不把索引变量提到函数顶部. 作用域越小, 后续改动越不容易误用旧值.
+
+初始化后不再赋值的局部变量, 声明时加 `const`. 循环体内每次迭代重新初始化的变量同样适用, `const` 只约束单次迭代内不得二次赋值.
+
+需要 `const` 的变量必须在初始化点声明, 不受变量在块开头声明的约束. 需要前置校验才能求值的变量, 在校验之后声明.
+
+---
+
+## 9. 面向对象与实例
+
+### 9.1 实例封装
 
 - 实例由调用者以静态存储提供.
 - 禁止模块内部依赖全局单例.
@@ -1135,15 +1158,15 @@ for (uint8_t index = 0U; index < count; index++)
 #endif
 
 #ifndef NERV_USE_GIMBAL
-#define NERV_USE_GIMBAL         NERV_ENABLE
+#define NERV_USE_GIMBAL         NERV_DISABLE
 #endif
 
 #ifndef NERV_USE_SHOOT
-#define NERV_USE_SHOOT          NERV_ENABLE
+#define NERV_USE_SHOOT          NERV_DISABLE
 #endif
 
 #ifndef NERV_USE_SAFETY
-#define NERV_USE_SAFETY         NERV_ENABLE
+#define NERV_USE_SAFETY         NERV_DISABLE
 #endif
 
 #ifndef NERV_USE_MOTOR
@@ -1621,8 +1644,6 @@ typedef struct
     NERV_StatusTypeDef (*transmit)(
         const NERV_FDCAN_InstanceTypeDef *self,
         const NERV_FDCAN_FrameTypeDef *frame);
-    uint32_t (*get_error)(const NERV_FDCAN_InstanceTypeDef *self);
-    void (*clear_error)(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
 } NERV_FDCAN_OpsTypeDef;
 
 struct NERV_FDCAN_Instance
@@ -1655,9 +1676,6 @@ NERV_StatusTypeDef NERV_FDCAN_RegisterRxCallback(
     NERV_FDCAN_RxCallbackTypeDef callback,
     void *user);
 
-uint32_t NERV_FDCAN_ReadError(const NERV_FDCAN_InstanceTypeDef *self);
-void NERV_FDCAN_ClearError(NERV_FDCAN_InstanceTypeDef *self, uint32_t mask);
-
 void NERV_FDCAN_OnRx(
     NERV_FDCAN_InstanceTypeDef *self,
     const NERV_FDCAN_FrameTypeDef *frame);
@@ -1669,7 +1687,6 @@ void NERV_FDCAN_OnRx(
 - `NERV_FDCAN_ConfigureFilter` 必须在 `NERV_FDCAN_Start` 之前调用.
 - `NERV_FDCAN_Transmit` 非阻塞. 没有空闲发送邮箱时返回 `NERV_BUSY`.
 - `NERV_FDCAN_OnRx` 由平台适配层在接收中断中调用. 它只复制回调指针并通知, 不阻塞, 不分配内存, 不调用日志.
-- `NERV_FDCAN_ReadError` 返回粘滞位掩码. `NERV_FDCAN_ClearError` 只清除 `mask` 中置位的错误.
 - 回调的上下文由注册函数契约写明. 若在中断中调用, 回调必须是 `ISR-safe`.
 
 ### 13.3 帧与过滤器规则
@@ -2042,11 +2059,11 @@ NERV_StatusTypeDef NERV_<Module>_EnterSafeState(
 
 ### 17.6 安全相关错误码
 
-安全域使用 `NERV_ERR_DOMAIN_SAFETY`:
+安全域使用 bit 17 与 bit 18:
 
 ```c
-#define NERV_ERR_SAFETY_ESTOP          (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(17U))
-#define NERV_ERR_SAFETY_LATCHED        (NERV_ERR_DOMAIN(NERV_ERR_DOMAIN_SAFETY) | NERV_ERR_BIT(18U))
+#define NERV_ERR_SAFETY_ESTOP          NERV_ERR_BIT(17U)
+#define NERV_ERR_SAFETY_LATCHED        NERV_ERR_BIT(18U)
 ```
 
 - `NERV_ERR_SAFETY_ESTOP` 表示软件急停已触发并锁存, 等待显式复位.
@@ -2163,7 +2180,7 @@ docs(agents): 明确仅库仓库的边界
 - 仓库没有 `.ioc`, `MDK-ARM`, `Core/`, `Drivers/`, 启动文件, 链接脚本或 IDE 工程.
 - 仓库没有 `app/`, 应用任务, `chassis_task`, `gimbal_task`, `shoot_task` 或 `app_init`.
 - 仓库没有 `tests/`, HIL 配置, CI 配置或测试报告.
-- 仓库没有构建系统文件. 使用者把自己的工程需要的源文件加入工程.
+- 仓库只提供可选的库构建入口 (`CMakeLists.txt`), 不生成工程, 不提交 IDE 工程与链接脚本. 使用者把自己的工程需要的源文件加入工程.
 - 库只包含 `public/`, `config/`, `bsp/`, `module/` 与仓库检查脚本.
 
 ### 20.2 可移植性

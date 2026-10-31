@@ -664,7 +664,10 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->fb.angle_rad              = 0.0f;
     self->fb.speed_radps            = 0.0f;
     self->fb.current_a              = 0.0f;
+    self->fb.torque_n_m             = 0.0f;
     self->fb.temperature_c          = 0;
+    self->fb.temperature_mos_c      = INT8_MIN;
+    self->fb.error_code             = 0U;
     self->measurement.angle_rad     = 0.0f;
     self->measurement.speed_radps   = 0.0f;
     self->measurement.torque_n_m    = 0.0f;

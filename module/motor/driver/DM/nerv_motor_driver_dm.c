@@ -184,7 +184,7 @@ static uint32_t NERV_Motor_Dm_EncodeUnipolar(float value, float max_value, uint3
   * @param  geo 输出帧几何, 不得为 NULL.
   * @retval NERV_OK 已写入.
   * @retval NERV_ERROR 参数为 NULL 或设备 id 越界.
-  * @note   控制帧标识符等于 tx_id_base 加设备 id (MIT 模式基值 0x000, 速度模式 0x200).
+  * @note   控制帧标识符等于 tx_id_low 加设备 id (MIT 模式基值 0x000, 速度模式 0x200).
   *         反馈帧标识符等于 rx_id_base 加设备 id, 要求每个电机的 Master ID 配置为
   *         0x000 加自身 CAN ID, 否则多电机共用同一 Master ID 会互相误收.
   * @note   ISR-safe.

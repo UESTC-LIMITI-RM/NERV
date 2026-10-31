@@ -855,8 +855,9 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *c
   * @return 已按安装方向取反并按 control_limit 限幅的控制目标.
   * @note   方向取反只作用于物理量分支: SCALAR 的 scalar, MIT 的 position,
   *         velocity 与 torque, VELOCITY 的 velocity_radps; kp 与 kd 不取反.
-  * @note   control_limit 只约束 SCALAR 分支的编码, 与型号描述符的 control_cmd_limit
-  *         同量纲 (如 16384, 25000). MIT 的范围由描述符的 p_max, v_max, t_max 约束.
+  * @note   control_limit 只约束 SCALAR 分支的编码, 与型号描述符的
+  *         control.scalar.cmd_limit 同量纲 (如 16384, 25000). MIT 的范围由
+  *         control.profile 的 p_max_rad, v_max_radps, t_max_n_m 约束.
   * @note   control_limit 为 NERV_DISABLE 时跳过实例限幅, 协议满量程限幅由驱动完成.
   */
 static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self)

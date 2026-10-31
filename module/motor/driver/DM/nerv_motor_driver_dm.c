@@ -501,8 +501,10 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
 /**
   * @brief  写达妙控制模式寄存器.
   * @param  bus 电机所在总线, 不得为 NULL.
+  * @param  model 型号描述符, 不得为 NULL. 模式帧不使用型号字段, 保留以匹配驱动
+  *               操作表的统一签名.
   * @param  device_id 电机 CAN ID.
-  * @param  mode 模式, 取 NERV_MOTOR_DM_MODE_*.
+  * @param  mode 模式, 取 NERV_MOTOR_CONTROL_* 枚举.
   * @retval NERV_OK 模式帧已交给总线.
   * @retval NERV_ERROR 参数为 NULL, 模式非法, 或总线发送失败.
   * @note   帧为 8 字节标准帧, 标识符固定 0x7FF, 数据为

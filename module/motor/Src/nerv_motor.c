@@ -901,7 +901,7 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
 
 /**
   * @brief  把本实例的控制量编码到控制帧内该实例对应的位置.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @param  frame 控制帧数据缓冲, 长度不小于实例的 frame_len, 调用方负责清零.
   * @retval NERV_OK 编码成功.
   * @retval NERV_ERROR 驱动编码失败.
@@ -919,7 +919,7 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
 
 /**
   * @brief  维护离线与过温错误位.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @param  now_ms 当前时刻, 单位 ms.
   * @note   fb_fresh 置位时刷新 last_rx_ms 并清除该标志. 首次监督以 now_ms 建立计时
   *         起点, 避免实例初始化后尚未收到反馈就立即判定离线. 之后按无符号回绕减法

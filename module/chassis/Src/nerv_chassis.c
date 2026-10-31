@@ -55,13 +55,10 @@ static const float wheel_sign_y[NERV_CHASSIS_WHEEL_COUNT] = {1.0f, -1.0f, -1.0f,
 static NERV_StatusTypeDef NERV_Chassis_ValidateMotor(const NERV_Motor_InstanceTypeDef *motor);
 static void NERV_Chassis_ResetState(NERV_Chassis_InstanceTypeDef *self);
 static void NERV_Chassis_RampVelocity(NERV_Chassis_InstanceTypeDef *self, float dt_s);
-static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTypeDef *config,
-                                                    const float *wheel_speed_radps,
-                                                    float center_distance_m,
+static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceTypeDef *self,
                                                     NERV_Chassis_VelocityTypeDef *measured);
-static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_ConfigTypeDef *config,
+static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_InstanceTypeDef *self,
                                                        const NERV_Chassis_VelocityTypeDef *command,
-                                                       float center_distance_m,
                                                        float *wheel_speed_radps);
 static NERV_StatusTypeDef
 NERV_Chassis_ComputeVelocityCommand(NERV_Chassis_InstanceTypeDef *self,
@@ -185,25 +182,30 @@ static void NERV_Chassis_RampVelocity(NERV_Chassis_InstanceTypeDef *self, float 
 
 /**
   * @brief  由各轮测量角速度正解机体系速度.
-  * @param  config 实例配置, 不得为 NULL.
-  * @param  wheel_speed_radps 各轮角速度, 单位 rad/s, 按轮号排列.
-  * @param  center_distance_m 全向轮等效力臂, 单位 m, 麦克纳姆轮忽略.
-  * @param  velocity 输出机体系速度, 不得为 NULL.
+  * @param  self 实例指针, 不得为 NULL.
+  * @param  measured 输出机体系速度, 不得为 NULL.
   * @retval NERV_OK 已写入.
   * @retval NERV_ERROR 参数为 NULL, 输入非有限值或几何非法.
+  * @note   全向轮使用 NERV_Chassis_Init 预计算的等效力臂, 麦克纳姆轮只用地心距之和.
   */
-static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTypeDef *config,
-                                                    const float *wheel_speed_radps,
-                                                    float center_distance_m,
+static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceTypeDef *self,
                                                     NERV_Chassis_VelocityTypeDef *measured)
 {
-    (void)center_distance_m;
+    const NERV_Chassis_ConfigTypeDef *config;
+    float wheel_speed_radps[NERV_CHASSIS_WHEEL_COUNT];
+    float center_distance_m;
 
-    if ((NULL == config) || (NULL == wheel_speed_radps) || (NULL == measured))
+    if ((NULL == self) || (NULL == measured))
     {
         return NERV_ERROR;
     }
 
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    {
+        wheel_speed_radps[index] = self->config.drive_motors[index]->measurement.speed_radps;
+    }
+
+    config = &self->config;
     for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         if (!isfinite(wheel_speed_radps[index]))
@@ -213,6 +215,8 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
     }
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM)
+
+    (void)center_distance_m;
 
     {
         float lever_sum_m;
@@ -274,22 +278,33 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
 
 /**
   * @brief  把机体系速度逆解为各轮目标角速度.
-  * @param  config 实例配置, 不得为 NULL.
-  * @param  velocity 机体系速度, 不得为 NULL.
-  * @param  center_distance_m 全向轮等效力臂, 单位 m, 麦克纳姆轮忽略.
+  * @param  self 实例指针, 不得为 NULL.
+  * @param  command 目标机体系速度, 不得为 NULL.
   * @param  wheel_speed_radps 输出各轮目标角速度, 单位 rad/s, 不得为 NULL.
   * @retval NERV_OK 已写入.
   * @retval NERV_ERROR 参数为 NULL 或几何非法.
+  * @note   全向轮使用 NERV_Chassis_Init 预计算的等效力臂, 麦克纳姆轮只用地心距之和.
   */
-static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_ConfigTypeDef *config,
+static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_InstanceTypeDef *self,
                                                        const NERV_Chassis_VelocityTypeDef *command,
-                                                       float center_distance_m,
                                                        float *wheel_speed_radps)
 {
-    if ((NULL == config) || (NULL == command) || (NULL == wheel_speed_radps))
+    const NERV_Chassis_ConfigTypeDef *config;
+    float center_distance_m;
+
+    if ((NULL == self) || (NULL == command) || (NULL == wheel_speed_radps))
     {
         return NERV_ERROR;
     }
+
+    config            = &self->config;
+    center_distance_m = 0.0f;
+
+#if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
+
+    center_distance_m = self->center_distance_m;
+
+#endif
 
     if (!(config->wheel_radius_m > 0.0f))
     {
@@ -568,7 +583,7 @@ NERV_StatusTypeDef NERV_Chassis_RegisterFaultCallback(NERV_Chassis_InstanceTypeD
 /**
   * @brief  设置目标机体系速度.
   * @param  self 实例指针, 不得为 NULL.
-  * @param  velocity 目标速度, 不得为 NULL, 三个分量必须为有限值.
+  * @param  target 目标速度, 不得为 NULL, 三个分量必须为有限值.
   * @retval NERV_OK 目标已保存.
   * @retval NERV_ERROR 参数为 NULL, 实例未初始化, 或分量非有限值.
   * @note   目标速度经加速度限幅后由 NERV_Chassis_Update 跟踪.
@@ -617,7 +632,6 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     float wheel_speed_radps[NERV_CHASSIS_WHEEL_COUNT];
     float wheel_speed_target[NERV_CHASSIS_WHEEL_COUNT];
     float drive_current_a[NERV_CHASSIS_WHEEL_COUNT];
-    float center_distance_m;
     float dt_s;
     bool ok;
 
@@ -630,14 +644,6 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     {
         return NERV_ERROR;
     }
-
-    center_distance_m = 0.0f;
-
-#if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
-
-    center_distance_m = self->center_distance_m;
-
-#endif
 
     dt_s = (float)(now_ms - self->last_update_ms) / 1000.0f;
 
@@ -664,8 +670,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
         }
     }
 
-    ok = (NERV_OK == NERV_Chassis_SolveForward(&self->config, wheel_speed_radps, center_distance_m,
-                                               &measured));
+    ok = (NERV_OK == NERV_Chassis_SolveForward(self, &measured));
 
     if (ok)
     {
@@ -675,8 +680,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     if (ok)
     {
-        ok = (NERV_OK == NERV_Chassis_SolveWheelSpeed(&self->config, &velocity_command,
-                                                      center_distance_m, wheel_speed_target));
+        ok = (NERV_OK == NERV_Chassis_SolveWheelSpeed(self, &velocity_command, wheel_speed_target));
     }
 
     if (ok)

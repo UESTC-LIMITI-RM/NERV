@@ -202,11 +202,10 @@ static float NERV_Math_MatrixNorm3(const float *matrix)
 {
     float norm;
     float row_sum;
-    uint8_t row;
 
     norm = 0.0f;
 
-    for (row = 0U; row < 3U; row++)
+    for (uint8_t row = 0U; row < 3U; row++)
     {
         row_sum =
             fabsf(matrix[row * 3U]) + fabsf(matrix[row * 3U + 1U]) + fabsf(matrix[row * 3U + 2U]);
@@ -252,8 +251,6 @@ NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs,
     float work[9];
     float determinant;
     float matrix_norm;
-    uint8_t column;
-    uint8_t row;
 
     if ((NULL == matrix) || (NULL == rhs) || (NULL == solution))
     {
@@ -275,9 +272,9 @@ NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs,
         return NERV_ERROR;
     }
 
-    for (column = 0U; column < 3U; column++)
+    for (uint8_t column = 0U; column < 3U; column++)
     {
-        for (row = 0U; row < 9U; row++)
+        for (uint8_t row = 0U; row < 9U; row++)
         {
             work[row] = matrix[row];
         }

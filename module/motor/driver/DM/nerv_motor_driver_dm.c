@@ -18,6 +18,8 @@
 #include "nerv_motor_driver.h"
 #include "nerv_status.h"
 
+#if (NERV_USE_MOTOR == NERV_ENABLE) && (NERV_USE_MOTOR_DM == NERV_ENABLE)
+
 /** @brief 达妙特殊命令码, 占用 8 字节帧的最后一字节, 前 7 字节为 0xFF. */
 #define __NERV_DM_CMD_CLEAR_ERROR 0xFBU
 #define __NERV_DM_CMD_ENABLE      0xFCU
@@ -37,8 +39,6 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SetMode(const NERV_FDCAN_InstanceTypeDef
                                                 const NERV_Motor_ModelTypeDef *model,
                                                 uint8_t device_id,
                                                 NERV_Motor_ControlKindTypeDef mode);
-
-#if (NERV_USE_MOTOR == NERV_ENABLE) && (NERV_USE_MOTOR_DM == NERV_ENABLE)
 
 #define __NERV_DM_FRAME_LEN 8U
 #define __NERV_DM_POS_MAX   65535.0f
@@ -63,8 +63,8 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_MIT,
-    .torque_constant_n_m_per_a   = 1.2f,
+    .control_mode                = NERV_MOTOR_CONTROL_MIT,
+    .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
@@ -93,8 +93,8 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_SCALAR,
-    .torque_constant_n_m_per_a   = 1.2f,
+    .control_mode                = NERV_MOTOR_CONTROL_SCALAR,
+    .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
     .scalar_quantity             = NERV_MOTOR_SCALAR_SPEED,
@@ -124,8 +124,8 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_POSITION_VELOCITY,
-    .torque_constant_n_m_per_a   = 1.2f,
+    .control_mode                = NERV_MOTOR_CONTROL_POSITION_VELOCITY,
+    .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
@@ -226,17 +226,6 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
                                                  uint8_t *frame, uint8_t device_id,
                                                  const NERV_Motor_ControlTypeDef *control)
 {
-    uint32_t p_raw;
-    uint32_t v_raw;
-    uint32_t kp_raw;
-    uint32_t kd_raw;
-    uint32_t t_raw;
-    union
-    {
-        float f;
-        uint8_t b[4];
-    } velocity;
-
     if ((NULL == model) || (NULL == frame) || (NULL == control))
     {
         return NERV_ERROR;
@@ -247,23 +236,23 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_ERROR;
     }
 
-    if (NERV_MOTOR_CONTROL_MIT == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_MIT == model->control_mode)
     {
         if (NERV_MOTOR_CONTROL_MIT != control->kind)
         {
             return NERV_ERROR;
         }
 
-        p_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.position_rad,
-                                            model->control.profile.p_max_rad, 65535U);
-        v_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.velocity_radps,
-                                            model->control.profile.v_max_radps, 4095U);
-        kp_raw =
+        const uint32_t p_raw = NERV_Motor_Dm_EncodeBipolar(
+            control->u.mit.position_rad, model->control.profile.p_max_rad, 65535U);
+        const uint32_t v_raw = NERV_Motor_Dm_EncodeBipolar(
+            control->u.mit.velocity_radps, model->control.profile.v_max_radps, 4095U);
+        const uint32_t kp_raw =
             NERV_Motor_Dm_EncodeUnipolar(control->u.mit.kp, model->control.profile.kp_max, 4095U);
-        kd_raw =
+        const uint32_t kd_raw =
             NERV_Motor_Dm_EncodeUnipolar(control->u.mit.kd, model->control.profile.kd_max, 4095U);
-        t_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.torque_n_m,
-                                            model->control.profile.t_max_n_m, 4095U);
+        const uint32_t t_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.torque_n_m,
+                                                           model->control.profile.t_max_n_m, 4095U);
 
         frame[0] = (uint8_t)((p_raw >> 8) & 0xFFU);
         frame[1] = (uint8_t)(p_raw & 0xFFU);
@@ -277,12 +266,18 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_OK;
     }
 
-    if (NERV_MOTOR_CONTROL_SCALAR == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_SCALAR == model->control_mode)
     {
         if (NERV_MOTOR_CONTROL_SCALAR != control->kind)
         {
             return NERV_ERROR;
         }
+
+        union
+        {
+            float f;
+            uint8_t b[4];
+        } velocity;
 
         velocity.f = control->u.scalar;
 
@@ -298,7 +293,7 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_OK;
     }
 
-    if (NERV_MOTOR_CONTROL_POSITION_VELOCITY == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_POSITION_VELOCITY == model->control_mode)
     {
         union
         {
@@ -506,8 +501,10 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
 /**
   * @brief  写达妙控制模式寄存器.
   * @param  bus 电机所在总线, 不得为 NULL.
+  * @param  model 型号描述符, 不得为 NULL. 模式帧不使用型号字段, 保留以匹配驱动
+  *               操作表的统一签名.
   * @param  device_id 电机 CAN ID.
-  * @param  mode 模式, 取 NERV_MOTOR_DM_MODE_*.
+  * @param  mode 模式, 取 NERV_MOTOR_CONTROL_* 枚举.
   * @retval NERV_OK 模式帧已交给总线.
   * @retval NERV_ERROR 参数为 NULL, 模式非法, 或总线发送失败.
   * @note   帧为 8 字节标准帧, 标识符固定 0x7FF, 数据为

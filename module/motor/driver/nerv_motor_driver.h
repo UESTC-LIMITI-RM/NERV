@@ -136,8 +136,7 @@ typedef struct
     float torque_constant_n_m_per_a; /**< 手册给出的扭矩常数, 单位 N·m/A, 0 表示未提供 */
     float rated_gear_ratio;          /**< 手册标称减速比, 无减速箱填 1, 必须大于 0 */
     bool fb_torque_present; /**< true 表示反馈直接给出转矩, false 表示由电流乘扭矩常数换算 */
-    uint8_t
-        control_mode; /**< 控制模式, 取 NERV_Motor_ControlKindTypeDef, 决定 control 联合体的有效成员 */
+    NERV_Motor_ControlKindTypeDef control_mode; /**< 控制模式, 决定 control 联合体的有效成员 */
     NERV_Motor_ScalarQuantityTypeDef
         scalar_quantity; /**< SCALAR 控制量量纲, 仅 SCALAR 模式有效, 决定 full_scale 的单位 */
     union

@@ -29,10 +29,8 @@
 
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
-static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config);
-static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
-                                               const NERV_Motor_FbTypeDef *fb,
-                                               NERV_Motor_MeasurementTypeDef *measurement);
+static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self);
+static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self);
 static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self);
 static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
                                                 uint8_t *frame);
@@ -54,7 +52,7 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
   * @param  config 配置指针, 不得为 NULL. 内容被复制, 调用方保留所有权.
   * @retval NERV_OK 配置已绑定, 帧几何信息已缓存, 实例进入就绪状态.
   * @retval NERV_ERROR self 或 config 为 NULL, config 的 driver, driver 的 model,
-  *         driver 的 ops, ops 的 get_frame_geo, encode_tx, decode_fb 或 bus 为 NULL,
+  *         driver 的 ops 或 bus 为 NULL, ops 的任一操作指针为空,
   *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
   *         control_limit 超过 32767, device_id 超出描述符的 id_min 到 id_max 范围,
   *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
@@ -78,7 +76,9 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
     if ((NULL == config->driver) || (NULL == config->driver->model) ||
         (NULL == config->driver->ops) || (NULL == config->driver->ops->get_frame_geo) ||
         (NULL == config->driver->ops->encode_tx) || (NULL == config->driver->ops->decode_fb) ||
-        (NULL == config->bus))
+        (NULL == config->driver->ops->enable) || (NULL == config->driver->ops->disable) ||
+        (NULL == config->driver->ops->clear_fault) || (NULL == config->driver->ops->set_mode) ||
+        (NULL == config->driver->ops->save_zero) || (NULL == config->bus))
     {
         return NERV_ERROR;
     }
@@ -246,7 +246,7 @@ NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t 
         return NERV_ERROR;
     }
 
-    if (NERV_OK != NERV_Motor_ConvertFb(&self->config, &self->fb, &self->measurement))
+    if (NERV_OK != NERV_Motor_ConvertFb(self))
     {
         return NERV_ERROR;
     }
@@ -286,7 +286,6 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 {
     NERV_StatusTypeDef overall;
     NERV_StatusTypeDef status;
-    bool first_of_group;
 
     if ((NULL == members) || (0U == count))
     {
@@ -295,12 +294,7 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     for (uint8_t index = 0U; index < count; index++)
     {
-        if (NULL == members[index])
-        {
-            return NERV_ERROR;
-        }
-
-        if (!members[index]->initialized)
+        if ((NULL == members[index]) || (!members[index]->initialized))
         {
             return NERV_ERROR;
         }
@@ -323,7 +317,7 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     for (uint8_t first = 0U; first < count; first++)
     {
-        first_of_group = true;
+        bool first_of_group = true;
 
         for (uint8_t index = 0U; index < first; index++)
         {
@@ -509,10 +503,10 @@ NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  使能电机.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
-  * @note   驱动不支持时为空操作, 便于上层统一调用.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
+  * @note   驱动不支持该能力时返回 NERV_ERROR, 上层可统一调用并检查返回值.
   */
 NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
 {
@@ -526,7 +520,8 @@ NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->enable))
     {
         return NERV_ERROR;
     }
@@ -537,9 +532,9 @@ NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  失能电机.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   */
 NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
 {
@@ -553,7 +548,8 @@ NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->disable))
     {
         return NERV_ERROR;
     }
@@ -564,9 +560,9 @@ NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  清除电机故障.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   */
 NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
 {
@@ -580,7 +576,8 @@ NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->clear_fault))
     {
         return NERV_ERROR;
     }
@@ -591,10 +588,10 @@ NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  运行期切换控制模式.
-  * @param  self 实例指针.
+  * @param  self 实例指针, 不得为 NULL.
   * @param  mode 目标控制模式, 取 NERV_Motor_ControlKindTypeDef.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   * @warning 达妙等驱动会把模式写入参数区并掉电保存. 参数区擦写寿命有限, 每个
   *          控制周期都调用会在数分钟内耗尽寿命并损坏电机. 只能在初始化或模式变更
   *          时调用一次.
@@ -612,7 +609,8 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->set_mode))
     {
         return NERV_ERROR;
     }
@@ -623,9 +621,9 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
 
 /**
   * @brief  保存当前位置为零点.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   * @warning 写入参数区并掉电保存. 参数区擦写寿命有限, 每个控制周期都调用会在数分钟内
   *          耗尽寿命并损坏电机. 只能在标定零点时调用一次.
   */
@@ -641,7 +639,8 @@ NERV_StatusTypeDef NERV_Motor_SaveZero(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->save_zero))
     {
         return NERV_ERROR;
     }
@@ -659,7 +658,10 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->fb.angle_rad              = 0.0f;
     self->fb.speed_radps            = 0.0f;
     self->fb.current_a              = 0.0f;
+    self->fb.torque_n_m             = 0.0f;
     self->fb.temperature_c          = 0;
+    self->fb.temperature_mos_c      = INT8_MIN;
+    self->fb.error_code             = 0U;
     self->measurement.angle_rad     = 0.0f;
     self->measurement.speed_radps   = 0.0f;
     self->measurement.torque_n_m    = 0.0f;
@@ -754,20 +756,20 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         }
     }
 
-    if (model->control_mode > (uint8_t)NERV_MOTOR_CONTROL_POSITION_VELOCITY)
+    if (model->control_mode > NERV_MOTOR_CONTROL_POSITION_VELOCITY)
     {
         return NERV_ERROR;
     }
 
-    if (NERV_MOTOR_CONTROL_SCALAR == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_SCALAR == model->control_mode)
     {
-        /* 标量模式驱动的量程字段可能位于 control.scalar 或 control.profile,
+        /* 标量模式驱动的量程字段位于 control.scalar 或 control.profile,
            两类驱动各自使用其中一套. */
-        bool scalar_ok  = isfinite(model->control.scalar.full_scale) &&
-                          (model->control.scalar.full_scale > 1.0e-3f) &&
-                          (model->control.scalar.cmd_limit > 0);
-        bool profile_ok = isfinite(model->control.profile.v_max_radps) &&
-                          (model->control.profile.v_max_radps > 1.0e-3f);
+        const bool scalar_ok  = isfinite(model->control.scalar.full_scale) &&
+                                (model->control.scalar.full_scale > 1.0e-3f) &&
+                                (model->control.scalar.cmd_limit > 0);
+        const bool profile_ok = isfinite(model->control.profile.v_max_radps) &&
+                                (model->control.profile.v_max_radps > 1.0e-3f);
         if (!scalar_ok && !profile_ok)
         {
             return NERV_ERROR;
@@ -784,7 +786,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         }
     }
 
-    if (NERV_MOTOR_CONTROL_MIT == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_MIT == model->control_mode)
     {
         if (!isfinite(model->control.profile.t_max_n_m) ||
             (model->control.profile.t_max_n_m <= 0.0f) ||
@@ -800,58 +802,55 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
 
 /**
   * @brief  给出安装方向对应的符号.
-  * @param  config 实例配置, 由调用方保证不为 NULL.
-  * @return invert_direction 为 true 时返回 -1.0f, 否则返回 1.0f.
+  * @param  self 实例指针, 由调用方保证不为 NULL.
+  * @return self->config.invert_direction 为 true 时返回 -1.0f, 否则返回 1.0f.
   */
-static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config)
+static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self)
 {
-    return config->invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
+    return self->config.invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
 }
 
 /**
   * @brief  把转子量反馈换算为机构系测量值.
-  * @param  config 实例配置, 必须已通过 NERV_Motor_Init 校验, 不得为 NULL.
-  * @param  fb 转子量反馈, 不得为 NULL.
-  * @param  measurement 输出机构系测量值, 不得为 NULL.
-  * @retval NERV_OK 换算完成, measurement 已写入.
-  * @retval NERV_ERROR 参数为 NULL.
-  * @note   角度与角速度除以 gear_ratio, 控制量透传, 全部乘安装方向符号. 角度结果
-  *         归回 [0, 2π).
+  * @param  self 实例指针, 必须已通过 NERV_Motor_Init 校验, 不得为 NULL.
+  * @retval NERV_OK 换算完成, self->measurement 已写入.
+  * @retval NERV_ERROR self 为 NULL.
+  * @note   角度与角速度除以 gear_ratio, 转矩按型号换算, 全部乘安装方向符号.
+  *         角度结果归回 [0, 2π).
   */
-static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
-                                               const NERV_Motor_FbTypeDef *fb,
-                                               NERV_Motor_MeasurementTypeDef *measurement)
+static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
 {
-    float sign;
-
-    if ((NULL == config) || (NULL == fb) || (NULL == measurement))
+    if ((NULL == self) || (!self->initialized))
     {
         return NERV_ERROR;
     }
 
-    sign = NERV_Motor_InvertSign(config);
+    const NERV_Motor_ModelTypeDef *model = self->config.driver->model;
+    const float gear_ratio               = self->config.gear_ratio;
+    const float sign                     = NERV_Motor_InvertSign(self);
 
-    measurement->angle_rad =
-        NERV_Math_Wrap(fb->angle_rad / config->gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
-    measurement->speed_radps = fb->speed_radps / config->gear_ratio * sign;
-    if (config->driver->model->fb_torque_present)
+    self->measurement.angle_rad =
+        NERV_Math_Wrap(self->fb.angle_rad / gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
+    self->measurement.speed_radps = self->fb.speed_radps / gear_ratio * sign;
+
+    if (model->fb_torque_present)
     {
-        measurement->torque_n_m = fb->torque_n_m * config->gear_ratio * sign;
+        self->measurement.torque_n_m = self->fb.torque_n_m * gear_ratio * sign;
     }
     else
     {
-        measurement->torque_n_m = fb->current_a * config->driver->model->torque_constant_n_m_per_a *
-                                  config->gear_ratio / config->driver->model->rated_gear_ratio *
-                                  sign;
+        self->measurement.torque_n_m = self->fb.current_a * model->torque_constant_n_m_per_a *
+                                       gear_ratio / model->rated_gear_ratio * sign;
     }
-    measurement->temperature_c = fb->temperature_c;
+
+    self->measurement.temperature_c = self->fb.temperature_c;
 
     return NERV_OK;
 }
 
 /**
   * @brief  给出本周期应发送的控制目标.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @return 已按安装方向取反并按 control_limit 限幅的控制目标.
   * @note   方向取反只作用于物理量分支: SCALAR 的 scalar, MIT 的 position,
   *         velocity 与 torque, VELOCITY 的 velocity_radps; kp 与 kd 不取反.
@@ -866,7 +865,7 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
     float sign;
 
     control = self->target_control;
-    sign    = NERV_Motor_InvertSign(&self->config);
+    sign    = NERV_Motor_InvertSign(self);
 
     switch (control.kind)
     {
@@ -902,7 +901,7 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
 
 /**
   * @brief  把本实例的控制量编码到控制帧内该实例对应的位置.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @param  frame 控制帧数据缓冲, 长度不小于实例的 frame_len, 调用方负责清零.
   * @retval NERV_OK 编码成功.
   * @retval NERV_ERROR 驱动编码失败.
@@ -920,7 +919,7 @@ static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef
 
 /**
   * @brief  维护离线与过温错误位.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @param  now_ms 当前时刻, 单位 ms.
   * @note   fb_fresh 置位时刷新 last_rx_ms 并清除该标志. 首次监督以 now_ms 建立计时
   *         起点, 避免实例初始化后尚未收到反馈就立即判定离线. 之后按无符号回绕减法

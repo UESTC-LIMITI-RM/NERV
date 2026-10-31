@@ -479,7 +479,6 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
 {
     NERV_FDCAN_FrameTypeDef frame;
     NERV_Motor_FrameGeoTypeDef geo;
-    uint8_t index;
 
     if ((NULL == bus) || (NULL == model))
     {
@@ -491,7 +490,7 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < __NERV_DM_FRAME_LEN; index++)
+    for (uint8_t index = 0U; index < __NERV_DM_FRAME_LEN; index++)
     {
         frame.data[index] = 0xFFU;
     }

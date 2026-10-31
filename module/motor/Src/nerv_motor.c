@@ -286,8 +286,6 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 {
     NERV_StatusTypeDef overall;
     NERV_StatusTypeDef status;
-    uint8_t first;
-    uint8_t index;
     bool first_of_group;
 
     if ((NULL == members) || (0U == count))
@@ -295,7 +293,7 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < count; index++)
+    for (uint8_t index = 0U; index < count; index++)
     {
         if (NULL == members[index])
         {
@@ -310,14 +308,10 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     if (NERV_OK != NERV_Motor_ValidateGroups(members, count))
     {
-        for (index = 0U; index < count; index++)
-        {
-        }
-
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < count; index++)
+    for (uint8_t index = 0U; index < count; index++)
     {
         if (NERV_OK != NERV_Motor_Update(members[index], now_ms))
         {
@@ -327,11 +321,11 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     overall = NERV_OK;
 
-    for (first = 0U; first < count; first++)
+    for (uint8_t first = 0U; first < count; first++)
     {
         first_of_group = true;
 
-        for (index = 0U; index < first; index++)
+        for (uint8_t index = 0U; index < first; index++)
         {
             if (NERV_Motor_SameGroup(members[index], members[first]))
             {
@@ -988,9 +982,7 @@ static bool NERV_Motor_SameGroup(const NERV_Motor_InstanceTypeDef *lhs,
 static void NERV_Motor_SetGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                       uint8_t first)
 {
-    uint8_t index;
-
-    for (index = 0U; index < count; index++)
+    for (uint8_t index = 0U; index < count; index++)
     {
         if (NERV_Motor_SameGroup(members[index], members[first]))
         {
@@ -1008,9 +1000,7 @@ static void NERV_Motor_SetGroupTxFail(NERV_Motor_InstanceTypeDef *const *members
 static void NERV_Motor_ClearGroupTxFail(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                         uint8_t first)
 {
-    uint8_t index;
-
-    for (index = 0U; index < count; index++)
+    for (uint8_t index = 0U; index < count; index++)
     {
         if (NERV_Motor_SameGroup(members[index], members[first]))
         {
@@ -1030,12 +1020,9 @@ static void NERV_Motor_ClearGroupTxFail(NERV_Motor_InstanceTypeDef *const *membe
 static NERV_StatusTypeDef NERV_Motor_ValidateGroups(NERV_Motor_InstanceTypeDef *const *members,
                                                     uint8_t count)
 {
-    uint8_t first;
-    uint8_t second;
-
-    for (first = 0U; first < count; first++)
+    for (uint8_t first = 0U; first < count; first++)
     {
-        for (second = (uint8_t)(first + 1U); second < count; second++)
+        for (uint8_t second = (uint8_t)(first + 1U); second < count; second++)
         {
             if (!NERV_Motor_SameGroup(members[first], members[second]))
             {
@@ -1072,8 +1059,6 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
                                                         uint8_t count, uint8_t first)
 {
     NERV_FDCAN_FrameTypeDef frame;
-    uint8_t index;
-    uint8_t slot;
 
     if (members[first]->geo.len > NERV_FDCAN_DATA_MAX)
     {
@@ -1084,12 +1069,12 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
     frame.len   = members[first]->geo.len;
     frame.flags = (uint8_t)NERV_FDCAN_FLAG_NONE;
 
-    for (slot = 0U; slot < frame.len; slot++)
+    for (uint8_t slot = 0U; slot < frame.len; slot++)
     {
         frame.data[slot] = 0U;
     }
 
-    for (index = 0U; index < count; index++)
+    for (uint8_t index = 0U; index < count; index++)
     {
         if (!NERV_Motor_SameGroup(members[index], members[first]))
         {

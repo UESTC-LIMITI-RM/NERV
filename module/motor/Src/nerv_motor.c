@@ -816,7 +816,8 @@ static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self)
   * @retval NERV_OK 换算完成, self->measurement 已写入.
   * @retval NERV_ERROR self 为 NULL.
   * @note   角度与角速度除以 gear_ratio, 转矩按型号换算, 全部乘安装方向符号.
-  *         角度结果归回 [0, 2π).
+  * @note   角度不做归一化, 原样保留驱动解码出的值. 达妙反馈为 ±P_MAX 范围,
+  *         DJI 的编码器量本身落在 [0, 2π).
   */
 static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
 {
@@ -829,8 +830,7 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
     const float gear_ratio               = self->config.gear_ratio;
     const float sign                     = NERV_Motor_InvertSign(self);
 
-    self->measurement.angle_rad =
-        NERV_Math_Wrap(self->fb.angle_rad / gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
+    self->measurement.angle_rad   = self->fb.angle_rad / gear_ratio * sign;
     self->measurement.speed_radps = self->fb.speed_radps / gear_ratio * sign;
 
     if (model->fb_torque_present)

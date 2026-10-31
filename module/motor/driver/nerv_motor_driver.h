@@ -33,7 +33,8 @@ extern "C" {
   */
 typedef struct NERV_Motor_Fb
 {
-    float angle_rad;   /**< 转子机械角度, 单位 rad, 逆时针为正, 范围 [0, 2π). */
+    float angle_rad; /**< 转子机械角度, 单位 rad, 逆时针为正. 值域由协议决定: 达妙为
+                          ±P_MAX, DJI 编码器量为 [0, 2π). */
     float speed_radps; /**< 转子转速, 单位 rad/s, 逆时针为正. */
     float current_a; /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. 型号不上报时置 0. */
     float torque_n_m;     /**< 转子输出转矩, 单位 N·m, 型号不上报时置 0. */

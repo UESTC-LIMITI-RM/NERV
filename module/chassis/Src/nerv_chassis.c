@@ -19,13 +19,30 @@
 
 #if (NERV_USE_CHASSIS == NERV_ENABLE)
 
-/* 内部实现常数. */
-#define __NERV_CHASSIS_MAX_DT_S             0.1f
-#define __NERV_CHASSIS_MIN_DT_S             0.001f
-#define __NERV_CHASSIS_DIRECTION_SUM        2.0f
-#define __NERV_CHASSIS_OMNI_FORCE_FACTOR    0.35355339f
-#define __NERV_CHASSIS_MECANUM_FORCE_FACTOR 0.25f
-#define __NERV_CHASSIS_MIN_SCALE            1.0e-3f
+/** @brief 控制周期的上限, 单位 s.
+  * @note  两次调用间隔超过本值时按本值计算. 长时间停更后, 斜坡, PID 积分与里程计
+  *        会一次性推进一大步, 产生可见跳变. */
+#define __NERV_CHASSIS_MAX_DT_S 0.1f
+
+/** @brief 控制周期的下限, 单位 s.
+  * @note  now_ms 未推进时差值为 0, PID 的微分项会退化为 0/0, 里程计也不前进.
+  *        把间隔钳到本值, 保证每个周期都有可用的正间隔. */
+#define __NERV_CHASSIS_MIN_DT_S 0.001f
+
+/** @brief 麦克纳姆轮正解的方向系数和, 取 2.
+  * @note  四轮布局下 vx 与 vy 的正解分母为 2 * DIRECTION_SUM, 即 4;
+  *        wz 的分母再乘等效力臂 (center_offset_x_m + center_offset_y_m). */
+#define __NERV_CHASSIS_DIRECTION_SUM 2.0f
+
+/** @brief 全向轮正解系数, 等于 1/(2 * sqrt(2)), 约 0.35355339.
+  * @note  各轮驱动方向为周向切向, 分量是 1/sqrt(2). 四轮求和后乘以本系数得到车体
+  *        平移速度. 与轮径和布局尺寸无关, 只由驱动方向决定. */
+#define __NERV_CHASSIS_OMNI_FORCE_FACTOR 0.35355339f
+
+/** @brief 电机量程有效性下限.
+  * @note  control 是 union, 型号描述符填错字段时, 原字段的位模式可能被解释成一个
+  *        极小的正浮点数. 仅判断大于 0 会让这种脏数据通过校验, 因此用本值过滤. */
+#define __NERV_CHASSIS_MIN_SCALE 1.0e-3f
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
 
@@ -105,8 +122,6 @@ static NERV_StatusTypeDef NERV_Chassis_ValidateMotor(const NERV_Motor_InstanceTy
   */
 static void NERV_Chassis_ResetState(NERV_Chassis_InstanceTypeDef *self)
 {
-    uint8_t index;
-
     self->target_velocity.vx_mps    = 0.0f;
     self->target_velocity.vy_mps    = 0.0f;
     self->target_velocity.wz_radps  = 0.0f;
@@ -121,7 +136,7 @@ static void NERV_Chassis_ResetState(NERV_Chassis_InstanceTypeDef *self)
     (void)NERV_PID_Reset(&self->translate_pid[1]);
     (void)NERV_PID_Reset(&self->rotate_pid);
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         (void)NERV_PID_Reset(&self->wheel_speed_pid[index]);
     }
@@ -182,8 +197,6 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
                                                     float center_distance_m,
                                                     NERV_Chassis_VelocityTypeDef *measured)
 {
-    uint8_t index;
-
     (void)center_distance_m;
 
     if ((NULL == config) || (NULL == wheel_speed_radps) || (NULL == measured))
@@ -191,7 +204,7 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         if (!isfinite(wheel_speed_radps[index]))
         {
@@ -225,8 +238,6 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
 
 #else
 
-    (void)index;
-
     {
         float sum_direction_x;
         float sum_direction_y;
@@ -242,7 +253,7 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_ConfigTyp
         sum_direction_y = 0.0f;
         sum_lever       = 0.0f;
 
-        for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+        for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
             speed_mps = wheel_speed_radps[index] * config->wheel_radius_m;
             sum_direction_x += speed_mps * (-wheel_sign_y[index]);
@@ -275,8 +286,6 @@ static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_Config
                                                        float center_distance_m,
                                                        float *wheel_speed_radps)
 {
-    uint8_t index;
-
     if ((NULL == config) || (NULL == command) || (NULL == wheel_speed_radps))
     {
         return NERV_ERROR;
@@ -289,7 +298,6 @@ static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_Config
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM)
 
-    (void)index;
     (void)center_distance_m;
 
     {
@@ -323,7 +331,7 @@ static NERV_StatusTypeDef NERV_Chassis_SolveWheelSpeed(const NERV_Chassis_Config
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         wheel_speed_radps[index] =
             ((command->vx_mps * (-wheel_sign_y[index]) + command->vy_mps * wheel_sign_x[index]) /
@@ -389,10 +397,9 @@ NERV_Chassis_ComputeVelocityCommand(NERV_Chassis_InstanceTypeDef *self,
   */
 static void NERV_Chassis_UpdateHealth(NERV_Chassis_InstanceTypeDef *self)
 {
-    uint8_t index;
     uint32_t motor_error;
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         motor_error = NERV_Motor_ReadError(self->config.drive_motors[index]);
 
@@ -458,7 +465,6 @@ static void NERV_Chassis_UpdateOdometry(NERV_Chassis_InstanceTypeDef *self,
 NERV_StatusTypeDef NERV_Chassis_Init(NERV_Chassis_InstanceTypeDef *self,
                                      const NERV_Chassis_ConfigTypeDef *config)
 {
-    uint8_t index;
     NERV_PID_InstanceTypeDef pid_probe;
 
     if ((NULL == self) || (NULL == config))
@@ -466,7 +472,7 @@ NERV_StatusTypeDef NERV_Chassis_Init(NERV_Chassis_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         if (NERV_OK != NERV_Chassis_ValidateMotor(config->drive_motors[index]))
         {
@@ -508,7 +514,7 @@ NERV_StatusTypeDef NERV_Chassis_Init(NERV_Chassis_InstanceTypeDef *self,
     (void)NERV_PID_Init(&self->translate_pid[1], config->translate_pid);
     (void)NERV_PID_Init(&self->rotate_pid, config->rotate_pid);
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         (void)NERV_PID_Init(&self->wheel_speed_pid[index], config->wheel_pid);
     }
@@ -613,7 +619,6 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     float drive_current_a[NERV_CHASSIS_WHEEL_COUNT];
     float center_distance_m;
     float dt_s;
-    uint8_t index;
     bool ok;
 
     if (NULL == self)
@@ -647,7 +652,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     NERV_Chassis_RampVelocity(self, dt_s);
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         if (NERV_OK == NERV_Motor_GetMeasurement(self->config.drive_motors[index], &measurement))
         {
@@ -676,7 +681,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     if (ok)
     {
-        for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+        for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
             if (NERV_OK != NERV_PID_Update(&self->wheel_speed_pid[index], wheel_speed_target[index],
                                            wheel_speed_radps[index], 0.0f, dt_s,
@@ -690,7 +695,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     if (ok)
     {
-        for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+        for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
             if (NERV_OK !=
                 NERV_Motor_SetTarget(self->config.drive_motors[index], drive_current_a[index]))
@@ -827,8 +832,6 @@ void NERV_Chassis_ClearError(NERV_Chassis_InstanceTypeDef *self, uint32_t mask)
   */
 NERV_StatusTypeDef NERV_Chassis_EnterSafeState(NERV_Chassis_InstanceTypeDef *self)
 {
-    uint8_t index;
-
     if (NULL == self)
     {
         return NERV_ERROR;
@@ -848,7 +851,7 @@ NERV_StatusTypeDef NERV_Chassis_EnterSafeState(NERV_Chassis_InstanceTypeDef *sel
     (void)NERV_PID_Reset(&self->translate_pid[1]);
     (void)NERV_PID_Reset(&self->rotate_pid);
 
-    for (index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
+    for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         (void)NERV_PID_Reset(&self->wheel_speed_pid[index]);
         (void)NERV_Motor_SetTarget(self->config.drive_motors[index], 0.0f);

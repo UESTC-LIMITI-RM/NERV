@@ -29,10 +29,8 @@
 
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
-static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config);
-static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
-                                               const NERV_Motor_FbTypeDef *fb,
-                                               NERV_Motor_MeasurementTypeDef *measurement);
+static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self);
+static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self);
 static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self);
 static NERV_StatusTypeDef NERV_Motor_EncodeInto(const NERV_Motor_InstanceTypeDef *self,
                                                 uint8_t *frame);
@@ -246,7 +244,7 @@ NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t 
         return NERV_ERROR;
     }
 
-    if (NERV_OK != NERV_Motor_ConvertFb(&self->config, &self->fb, &self->measurement))
+    if (NERV_OK != NERV_Motor_ConvertFb(self))
     {
         return NERV_ERROR;
     }
@@ -800,58 +798,55 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
 
 /**
   * @brief  给出安装方向对应的符号.
-  * @param  config 实例配置, 由调用方保证不为 NULL.
-  * @return invert_direction 为 true 时返回 -1.0f, 否则返回 1.0f.
+  * @param  self 实例指针, 由调用方保证不为 NULL.
+  * @return self->config.invert_direction 为 true 时返回 -1.0f, 否则返回 1.0f.
   */
-static float NERV_Motor_InvertSign(const NERV_Motor_ConfigTypeDef *config)
+static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self)
 {
-    return config->invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
+    return self->config.invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
 }
 
 /**
   * @brief  把转子量反馈换算为机构系测量值.
-  * @param  config 实例配置, 必须已通过 NERV_Motor_Init 校验, 不得为 NULL.
-  * @param  fb 转子量反馈, 不得为 NULL.
-  * @param  measurement 输出机构系测量值, 不得为 NULL.
-  * @retval NERV_OK 换算完成, measurement 已写入.
-  * @retval NERV_ERROR 参数为 NULL.
-  * @note   角度与角速度除以 gear_ratio, 控制量透传, 全部乘安装方向符号. 角度结果
-  *         归回 [0, 2π).
+  * @param  self 实例指针, 必须已通过 NERV_Motor_Init 校验, 不得为 NULL.
+  * @retval NERV_OK 换算完成, self->measurement 已写入.
+  * @retval NERV_ERROR self 为 NULL.
+  * @note   角度与角速度除以 gear_ratio, 转矩按型号换算, 全部乘安装方向符号.
+  *         角度结果归回 [0, 2π).
   */
-static NERV_StatusTypeDef NERV_Motor_ConvertFb(const NERV_Motor_ConfigTypeDef *config,
-                                               const NERV_Motor_FbTypeDef *fb,
-                                               NERV_Motor_MeasurementTypeDef *measurement)
+static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
 {
-    float sign;
-
-    if ((NULL == config) || (NULL == fb) || (NULL == measurement))
+    if ((NULL == self) || (!self->initialized))
     {
         return NERV_ERROR;
     }
 
-    sign = NERV_Motor_InvertSign(config);
+    const NERV_Motor_ModelTypeDef *model = self->config.driver->model;
+    const float gear_ratio               = self->config.gear_ratio;
+    const float sign                     = NERV_Motor_InvertSign(self);
 
-    measurement->angle_rad =
-        NERV_Math_Wrap(fb->angle_rad / config->gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
-    measurement->speed_radps = fb->speed_radps / config->gear_ratio * sign;
-    if (config->driver->model->fb_torque_present)
+    self->measurement.angle_rad =
+        NERV_Math_Wrap(self->fb.angle_rad / gear_ratio * sign, 0.0f, NERV_MATH_TWO_PI);
+    self->measurement.speed_radps = self->fb.speed_radps / gear_ratio * sign;
+
+    if (model->fb_torque_present)
     {
-        measurement->torque_n_m = fb->torque_n_m * config->gear_ratio * sign;
+        self->measurement.torque_n_m = self->fb.torque_n_m * gear_ratio * sign;
     }
     else
     {
-        measurement->torque_n_m = fb->current_a * config->driver->model->torque_constant_n_m_per_a *
-                                  config->gear_ratio / config->driver->model->rated_gear_ratio *
-                                  sign;
+        self->measurement.torque_n_m = self->fb.current_a * model->torque_constant_n_m_per_a *
+                                       gear_ratio / model->rated_gear_ratio * sign;
     }
-    measurement->temperature_c = fb->temperature_c;
+
+    self->measurement.temperature_c = self->fb.temperature_c;
 
     return NERV_OK;
 }
 
 /**
   * @brief  给出本周期应发送的控制目标.
-  * @param  self 实例指针, 必须已初始化, 由调用方保证不为 NULL.
+  * @param  self 实例指针, 由调用方保证已初始化且不为 NULL.
   * @return 已按安装方向取反并按 control_limit 限幅的控制目标.
   * @note   方向取反只作用于物理量分支: SCALAR 的 scalar, MIT 的 position,
   *         velocity 与 torque, VELOCITY 的 velocity_radps; kp 与 kd 不取反.
@@ -866,7 +861,7 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
     float sign;
 
     control = self->target_control;
-    sign    = NERV_Motor_InvertSign(&self->config);
+    sign    = NERV_Motor_InvertSign(self);
 
     switch (control.kind)
     {

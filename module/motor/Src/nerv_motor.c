@@ -52,7 +52,7 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
   * @param  config 配置指针, 不得为 NULL. 内容被复制, 调用方保留所有权.
   * @retval NERV_OK 配置已绑定, 帧几何信息已缓存, 实例进入就绪状态.
   * @retval NERV_ERROR self 或 config 为 NULL, config 的 driver, driver 的 model,
-  *         driver 的 ops, ops 的 get_frame_geo, encode_tx, decode_fb 或 bus 为 NULL,
+  *         driver 的 ops 或 bus 为 NULL, ops 的任一操作指针为空,
   *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
   *         control_limit 超过 32767, device_id 超出描述符的 id_min 到 id_max 范围,
   *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
@@ -76,7 +76,9 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
     if ((NULL == config->driver) || (NULL == config->driver->model) ||
         (NULL == config->driver->ops) || (NULL == config->driver->ops->get_frame_geo) ||
         (NULL == config->driver->ops->encode_tx) || (NULL == config->driver->ops->decode_fb) ||
-        (NULL == config->bus))
+        (NULL == config->driver->ops->enable) || (NULL == config->driver->ops->disable) ||
+        (NULL == config->driver->ops->clear_fault) || (NULL == config->driver->ops->set_mode) ||
+        (NULL == config->driver->ops->save_zero) || (NULL == config->bus))
     {
         return NERV_ERROR;
     }
@@ -507,10 +509,10 @@ NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  使能电机.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
-  * @note   驱动不支持时为空操作, 便于上层统一调用.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
+  * @note   驱动不支持该能力时返回 NERV_ERROR, 上层可统一调用并检查返回值.
   */
 NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
 {
@@ -524,7 +526,8 @@ NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->enable))
     {
         return NERV_ERROR;
     }
@@ -535,9 +538,9 @@ NERV_StatusTypeDef NERV_Motor_Enable(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  失能电机.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   */
 NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
 {
@@ -551,7 +554,8 @@ NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->disable))
     {
         return NERV_ERROR;
     }
@@ -562,9 +566,9 @@ NERV_StatusTypeDef NERV_Motor_Disable(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  清除电机故障.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   */
 NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
 {
@@ -578,7 +582,8 @@ NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->clear_fault))
     {
         return NERV_ERROR;
     }
@@ -589,10 +594,10 @@ NERV_StatusTypeDef NERV_Motor_ClearFault(NERV_Motor_InstanceTypeDef *self)
 
 /**
   * @brief  运行期切换控制模式.
-  * @param  self 实例指针.
+  * @param  self 实例指针, 不得为 NULL.
   * @param  mode 目标控制模式, 取 NERV_Motor_ControlKindTypeDef.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   * @warning 达妙等驱动会把模式写入参数区并掉电保存. 参数区擦写寿命有限, 每个
   *          控制周期都调用会在数分钟内耗尽寿命并损坏电机. 只能在初始化或模式变更
   *          时调用一次.
@@ -610,7 +615,8 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->set_mode))
     {
         return NERV_ERROR;
     }
@@ -621,9 +627,9 @@ NERV_StatusTypeDef NERV_Motor_SetMode(NERV_Motor_InstanceTypeDef *self,
 
 /**
   * @brief  保存当前位置为零点.
-  * @param  self 实例指针.
-  * @retval NERV_OK 已下发或驱动不支持该能力.
-  * @retval NERV_ERROR 实例为 NULL 或未初始化.
+  * @param  self 实例指针, 不得为 NULL.
+  * @retval NERV_OK 已下发.
+  * @retval NERV_ERROR 实例为 NULL, 未初始化, 或驱动不支持该能力.
   * @warning 写入参数区并掉电保存. 参数区擦写寿命有限, 每个控制周期都调用会在数分钟内
   *          耗尽寿命并损坏电机. 只能在标定零点时调用一次.
   */
@@ -639,7 +645,8 @@ NERV_StatusTypeDef NERV_Motor_SaveZero(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops))
+    if ((NULL == self->config.driver) || (NULL == self->config.driver->ops) ||
+        (NULL == self->config.driver->ops->save_zero))
     {
         return NERV_ERROR;
     }

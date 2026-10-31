@@ -47,8 +47,8 @@
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
 
 /* 轮号 0 到 3 依次为左前, 左后, 右后, 右前. */
-static const float wheel_sign_x[NERV_CHASSIS_WHEEL_COUNT] = {1.0f, 1.0f, -1.0f, -1.0f};
-static const float wheel_sign_y[NERV_CHASSIS_WHEEL_COUNT] = {1.0f, -1.0f, -1.0f, 1.0f};
+static const float wheel_sign_x[NERV_CHASSIS_WHEEL_COUNT] = {1.0f, -1.0f, -1.0f, 1.0f};
+static const float wheel_sign_y[NERV_CHASSIS_WHEEL_COUNT] = {1.0f, 1.0f, -1.0f, -1.0f};
 
 #endif /* NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI */
 

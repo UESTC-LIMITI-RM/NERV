@@ -226,17 +226,6 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
                                                  uint8_t *frame, uint8_t device_id,
                                                  const NERV_Motor_ControlTypeDef *control)
 {
-    uint32_t p_raw;
-    uint32_t v_raw;
-    uint32_t kp_raw;
-    uint32_t kd_raw;
-    uint32_t t_raw;
-    union
-    {
-        float f;
-        uint8_t b[4];
-    } velocity;
-
     if ((NULL == model) || (NULL == frame) || (NULL == control))
     {
         return NERV_ERROR;
@@ -247,23 +236,23 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_ERROR;
     }
 
-    if (NERV_MOTOR_CONTROL_MIT == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_MIT == model->control_mode)
     {
         if (NERV_MOTOR_CONTROL_MIT != control->kind)
         {
             return NERV_ERROR;
         }
 
-        p_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.position_rad,
-                                            model->control.profile.p_max_rad, 65535U);
-        v_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.velocity_radps,
-                                            model->control.profile.v_max_radps, 4095U);
-        kp_raw =
+        const uint32_t p_raw = NERV_Motor_Dm_EncodeBipolar(
+            control->u.mit.position_rad, model->control.profile.p_max_rad, 65535U);
+        const uint32_t v_raw = NERV_Motor_Dm_EncodeBipolar(
+            control->u.mit.velocity_radps, model->control.profile.v_max_radps, 4095U);
+        const uint32_t kp_raw =
             NERV_Motor_Dm_EncodeUnipolar(control->u.mit.kp, model->control.profile.kp_max, 4095U);
-        kd_raw =
+        const uint32_t kd_raw =
             NERV_Motor_Dm_EncodeUnipolar(control->u.mit.kd, model->control.profile.kd_max, 4095U);
-        t_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.torque_n_m,
-                                            model->control.profile.t_max_n_m, 4095U);
+        const uint32_t t_raw = NERV_Motor_Dm_EncodeBipolar(control->u.mit.torque_n_m,
+                                                           model->control.profile.t_max_n_m, 4095U);
 
         frame[0] = (uint8_t)((p_raw >> 8) & 0xFFU);
         frame[1] = (uint8_t)(p_raw & 0xFFU);
@@ -277,12 +266,18 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_OK;
     }
 
-    if (NERV_MOTOR_CONTROL_SCALAR == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_SCALAR == model->control_mode)
     {
         if (NERV_MOTOR_CONTROL_SCALAR != control->kind)
         {
             return NERV_ERROR;
         }
+
+        union
+        {
+            float f;
+            uint8_t b[4];
+        } velocity;
 
         velocity.f = control->u.scalar;
 

@@ -251,11 +251,6 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
                                                   uint8_t *frame, uint8_t device_id,
                                                   const NERV_Motor_ControlTypeDef *control)
 {
-    float control_value;
-    float control_clamped;
-    int32_t raw;
-    uint8_t offset;
-
     if ((NULL == model) || (NULL == frame) || (NULL == control) ||
         (control->kind != NERV_MOTOR_CONTROL_SCALAR) || !isfinite(control->u.scalar))
     {
@@ -267,15 +262,13 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    control_value = control->u.scalar;
-
-    control_clamped = NERV_Math_Clamp(control_value, -(float)model->control.scalar.cmd_limit,
-                                      (float)model->control.scalar.cmd_limit);
-
-    raw = (int32_t)control_clamped;
-
-    offset = (uint8_t)(((uint32_t)(device_id - model->id_min) % (uint32_t)model->motors_per_frame) *
-                       (uint32_t)__NERV_MOTOR_DJI_MOTOR_BYTES);
+    const float control_clamped =
+        NERV_Math_Clamp(control->u.scalar, -(float)model->control.scalar.cmd_limit,
+                        (float)model->control.scalar.cmd_limit);
+    const int32_t raw = (int32_t)control_clamped;
+    const uint8_t offset =
+        (uint8_t)(((uint32_t)(device_id - model->id_min) % (uint32_t)model->motors_per_frame) *
+                  (uint32_t)__NERV_MOTOR_DJI_MOTOR_BYTES);
 
     NERV_Motor_Dji_WriteBE16(frame, offset, (uint16_t)(int16_t)raw);
 
@@ -300,10 +293,6 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
                                                   const uint8_t *frame, uint8_t len,
                                                   NERV_Motor_FbTypeDef *fb)
 {
-    uint16_t angle_raw;
-    uint16_t speed_raw;
-    uint16_t current_raw;
-
     if ((NULL == model) || (NULL == frame) || (NULL == fb))
     {
         return NERV_ERROR;
@@ -314,15 +303,15 @@ static NERV_StatusTypeDef NERV_Motor_Dji_DecodeFb(const NERV_Motor_ModelTypeDef 
         return NERV_ERROR;
     }
 
-    angle_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_angle_off);
+    const uint16_t angle_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_angle_off);
 
     if (angle_raw >= model->angle_count)
     {
         return NERV_ERROR;
     }
 
-    speed_raw   = NERV_Motor_Dji_ReadBE16(frame, model->fb_speed_off);
-    current_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_current_off);
+    const uint16_t speed_raw   = NERV_Motor_Dji_ReadBE16(frame, model->fb_speed_off);
+    const uint16_t current_raw = NERV_Motor_Dji_ReadBE16(frame, model->fb_current_off);
 
     fb->angle_rad   = (float)angle_raw * NERV_MATH_TWO_PI / (float)model->angle_count;
     fb->speed_radps = NERV_Utils_RpmToRadps((float)(int16_t)speed_raw);

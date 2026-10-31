@@ -286,7 +286,6 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 {
     NERV_StatusTypeDef overall;
     NERV_StatusTypeDef status;
-    bool first_of_group;
 
     if ((NULL == members) || (0U == count))
     {
@@ -295,12 +294,7 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     for (uint8_t index = 0U; index < count; index++)
     {
-        if (NULL == members[index])
-        {
-            return NERV_ERROR;
-        }
-
-        if (!members[index]->initialized)
+        if ((NULL == members[index]) || (!members[index]->initialized))
         {
             return NERV_ERROR;
         }
@@ -323,7 +317,7 @@ NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *mem
 
     for (uint8_t first = 0U; first < count; first++)
     {
-        first_of_group = true;
+        bool first_of_group = true;
 
         for (uint8_t index = 0U; index < first; index++)
         {
@@ -769,13 +763,13 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
 
     if (NERV_MOTOR_CONTROL_SCALAR == model->control_mode)
     {
-        /* 标量模式驱动的量程字段可能位于 control.scalar 或 control.profile,
+        /* 标量模式驱动的量程字段位于 control.scalar 或 control.profile,
            两类驱动各自使用其中一套. */
-        bool scalar_ok  = isfinite(model->control.scalar.full_scale) &&
-                          (model->control.scalar.full_scale > 1.0e-3f) &&
-                          (model->control.scalar.cmd_limit > 0);
-        bool profile_ok = isfinite(model->control.profile.v_max_radps) &&
-                          (model->control.profile.v_max_radps > 1.0e-3f);
+        const bool scalar_ok  = isfinite(model->control.scalar.full_scale) &&
+                                (model->control.scalar.full_scale > 1.0e-3f) &&
+                                (model->control.scalar.cmd_limit > 0);
+        const bool profile_ok = isfinite(model->control.profile.v_max_radps) &&
+                                (model->control.profile.v_max_radps > 1.0e-3f);
         if (!scalar_ok && !profile_ok)
         {
             return NERV_ERROR;

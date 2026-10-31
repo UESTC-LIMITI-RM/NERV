@@ -161,7 +161,7 @@ float NERV_Math_Deadband(float value, float threshold)
   * @param  angle_rad 旋转角度, 单位 rad, 逆时针为正.
   * @retval NERV_OK 旋转成功.
   * @retval NERV_ERROR vx 或 vy 为 NULL.
-  * @note   云台系的底盘速度指令转到机体系时, 传入 yaw_gimbal 减 yaw_chassis 作为角度.
+  * @note   把云台系的底盘速度指令转到机体系时, 角度取云台航向减底盘航向.
   * @note   ISR-safe.
   */
 NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad)

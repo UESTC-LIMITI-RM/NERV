@@ -72,17 +72,15 @@ RoboMaster 的底盘构型, 云台轴数在同一次编译中只有一个是需�
 
 ```c
 /* 底盘构型: 使用者只保留一个选择, 值为 0 时表示未选择. */
-#define NERV_CHASSIS_TYPE_MECANUM   1U
-#define NERV_CHASSIS_TYPE_OMNI      2U
-#define NERV_CHASSIS_TYPE_STEERING  3U
+#define NERV_CHASSIS_TYPE_MECANUM 1U
+#define NERV_CHASSIS_TYPE_OMNI    2U
 
 #ifndef NERV_CHASSIS_TYPE
-#define NERV_CHASSIS_TYPE           NERV_CHASSIS_TYPE_MECANUM
+#define NERV_CHASSIS_TYPE NERV_CHASSIS_TYPE_OMNI
 #endif
 
 #if (NERV_CHASSIS_TYPE != NERV_CHASSIS_TYPE_MECANUM) && \
-    (NERV_CHASSIS_TYPE != NERV_CHASSIS_TYPE_OMNI) && \
-    (NERV_CHASSIS_TYPE != NERV_CHASSIS_TYPE_STEERING)
+    (NERV_CHASSIS_TYPE != NERV_CHASSIS_TYPE_OMNI)
 #error "NERV_CHASSIS_TYPE is not supported."
 #endif
 ```
@@ -110,9 +108,8 @@ RoboMaster 的底盘构型, 云台轴数在同一次编译中只有一个是需�
 /* module/chassis/Inc/nerv_chassis.h */
 typedef enum
 {
-    NERV_CHASSIS_TYPE_MECANUM_RT  = 1U,
-    NERV_CHASSIS_TYPE_OMNI_RT     = 2U,
-    NERV_CHASSIS_TYPE_STEERING_RT = 3U,
+    NERV_CHASSIS_TYPE_MECANUM_RT = 1U,
+    NERV_CHASSIS_TYPE_OMNI_RT    = 2U,
 } NERV_Chassis_KindTypeDef;
 ```
 
@@ -137,7 +134,7 @@ static void NERV_Chassis_SolveSteering(NERV_Chassis_InstanceTypeDef *self,
 
 需要用编译期选择的地方:
 
-- 底盘构型, 麦克纳姆, 全向, 舵轮.
+- 底盘构型, 麦克纳姆或全向.
 - 云台轴数, 两轴或三轴.
 - 板间通信链路, FDCAN 或 UART.
 - 模块裁剪, `NERV_USE_*`, 取 `NERV_ENABLE` 或 `NERV_DISABLE`.
@@ -174,7 +171,7 @@ public/Src/nerv_utils.c
 - [x] `nerv_types.h`: 定义 `NERV_AttitudeTypeDef`, 供底盘航向与装有 IMU 的模块共用. 只含三个角度, 字段注明轴向与正方向, 使用 SI 单位后缀.
 - [x] `nerv_utils.h`: 提供 `NERV_UTILS_ARRAY_SIZE`, `NERV_UTILS_TIMEOUT_MS`, `NERV_UTILS_TIMEOUT_S_TO_MS`, 以及 `NERV_Utils_*` 单位转换声明. 宏名写明输入与输出单位.
 - [x] `nerv_math.h`: 定义 `NERV_MATH_PI` 与 `NERV_MATH_TWO_PI`, 供角度与转速换算复用.
-- [x] `nerv_math.c`: 实现通用区间归一化 `NERV_Math_Wrap`, `NERV_Math_IsClose` 与限幅, 死区函数, 以及三阶线性方程组求解 `NERV_Math_SolveLinear3` (Cramer 法则, 供舵轮正解与力分解使用). 角度归一化使用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
+- [x] `nerv_math.c`: 实现通用区间归一化 `NERV_Math_Wrap`, `NERV_Math_IsClose` 与限幅, 死区函数, 以及三阶线性方程组求解 `NERV_Math_SolveLinear3` (Cramer 法则, 带相对奇异判据). 底盘当前不使用该函数, 保留给需要求解三阶方程组的模块. 角度归一化使用 `NERV_Math_Wrap(angle, -NERV_MATH_PI, NERV_MATH_PI)`.
 - [x] `nerv_math.c`: 实现绕 z 轴的二维旋转, 把云台系的底盘速度指令转到机体系. 角速度分量原样传递.
 - [x] `nerv_utils.c`: 实现 `NERV_Utils_RpmToRadps` 与 `NERV_Utils_RadpsToRpm`.
 - [x] 头文件自包含, 可被 C 与 C++ 编译器包含.
@@ -260,16 +257,18 @@ module/chassis/Src/nerv_chassis.c
 
 - [x] `nerv_chassis.h`: 定义机体系速度与里程计两个公开类型, 字段注明轴向与正方向, 使用 SI 单位后缀. 姿态复用 `public/Inc/nerv_types.h` 的 `NERV_AttitudeTypeDef`.
 - [x] 底盘接口只接受机体系速度. 遥控器的云台系指令由调用方转换, 转换用 `NERV_Math_` 的绕 z 轴旋转.
-- [x] 按第 3 节模板落 `NERV_CHASSIS_TYPE` 宏, 枚举镜像与 `_Static_assert` 校验.
-- [x] 轮数等派生宏按 `#if` 链推导, 并用 `#if defined(...)` 加 `#error` 禁止使用者覆盖. 三种构型均为 4 轮; 默认构型为全向轮.
-- [x] 轮径, 投影距, 扭矩常数, 限幅与速度环增益等可调项按 M4 先例全部下沉为实例配置字段, 由 `NERV_Chassis_Init` 校验范围, 不设模块级默认宏.
-- [x] 实现麦克纳姆, 全向, 舵轮三种解算, 每次编译只保留选中的一种. 三种构型均已实现: 全向轮与麦克纳姆轮为固定驱动方向的力分解 (麦轮分解系数 sqrt(2)/4, 杠杆为两投影距之和), 舵轮为动态舵角下的三阶正规方程求解 (正解与力分解共用矩阵, 求解用 public 层 `NERV_Math_SolveLinear3`) 加舵向角度环; 配置提供逐轮指令方向符号位 `wheel_inverted`; 构型间经 `#if` 编译期选择, 无运行期分派.
-- [x] 解算函数不使用运行期函数指针分派, 由 `#if` 直接调用.
-- [x] 全向轮解算按 4 轮布局: 轮号 0 到 3 依次为左前, 左后, 右后, 右前, 编号方向为绕底盘一周, 左前起始, 符号约定写入头文件契约; 控制框架采用速度环加力分解的三层串级 (运动学正解算, 平移与旋转速度环输出牵引力与转矩, 力分解叠加前馈后换算电流下发轮向电机), 四个固定方向的轮子合成任意牵引力与转矩, 等效实现舵轮框架的合力效果, 不设舵向电机.
-- [x] 里程计先推进角度再更新位置, 角度用 `NERV_Math_Wrap` 归一化到 [-π, π). 提供 `NERV_Chassis_SetOdometry` 供上层把视觉或惯性融合结果回写校正; 里程计功能可用编译期宏 `NERV_USE_CHASSIS_ODOMETRY` 整体裁剪.
-- [x] 斜坡规划: 目标速度按配置的平移与旋转加速度限幅平滑趋近 (分量独立限变化率, 反向必过零, 0 限幅直通), 规划值由速度环与舵角解算使用.
+- [x] 按第 3 节模板落 `NERV_CHASSIS_TYPE` 宏, 枚举镜像与 `_Static_assert` 校验. 只保留麦克纳姆轮与全向轮两种构型, 舵轮不在支持范围内.
+- [x] 轮数等派生宏按 `#if` 链推导, 并用 `#if defined(...)` 加 `#error` 禁止使用者覆盖. 两种构型均为 4 轮; 默认构型为全向轮.
+- [x] 轮径, 投影距, 加速度限幅与三个速度环的 PID 配置按 M4 先例全部下沉为实例配置字段, 由 `NERV_Chassis_Init` 校验范围, 不设模块级默认宏. 配置字段为 `drive_motors`, `wheel_radius_m`, `center_offset_x_m`, `center_offset_y_m`, `max_translate_accel_mps2`, `max_rotate_accel_radps2`, `translate_pid`, `rotate_pid`, `wheel_pid`.
+- [x] 实现麦克纳姆轮与全向轮两种解算, 每次编译只保留选中的一种. 麦克纳姆轮正解分母为 2 倍方向系数和, 逆解杠杆为两投影距之和; 全向轮用等效力臂 `(center_offset_x_m + center_offset_y_m) / sqrt(2)`, 在 `NERV_Chassis_Init` 中预计算. 两种解算都是固定方向轮组的线性组合, 构型间经 `#if` 编译期选择, 无运行期分派.
+- [x] 解算函数不使用运行期函数指针分派, 由 `#if` 直接调用. 内部函数统一以实例指针为第一参数, 配置与预计算量从实例读取, 不重复传参.
+- [x] 控制链为串级速控: `NERV_Chassis_RampVelocity` 把目标速度限幅为规划速度, `NERV_Chassis_SolveForward` 由各轮实测角速度正解机体系速度, `NERV_Chassis_ComputeVelocityCommand` 车体速度环输出修正后的速度指令, `NERV_Chassis_SolveWheelSpeed` 逆解为各轮目标角速度, 每轮速度环输出电流, 经 `NERV_Motor_SetTarget` 下发, `NERV_Motor_UpdateGroup` 完成发送. 不设力分解, 不设舵向电机.
+- [x] 全向轮解算按 4 轮布局: 轮号 0 到 3 依次为左前, 左后, 右后, 右前, 编号方向为绕底盘一周, 左前起始, 符号约定写入头文件契约.
+- [x] 里程计先推进角度再更新位置, 角度用 `NERV_Math_Wrap` 归一化到 [-π, π). 提供 `NERV_Chassis_SetOdometry` 供上层把视觉或惯性融合结果回写校正; 里程计功能可用编译期宏 `NERV_USE_CHASSIS_ODOMETRY` 整体裁剪, 默认 `NERV_DISABLE`.
+- [x] 斜坡规划: 目标速度按配置的平移与旋转加速度限幅平滑趋近 (分量独立限变化率, 反向必过零, 0 限幅直通). 控制周期按 `__NERV_CHASSIS_MAX_DT_S` 与 `__NERV_CHASSIS_MIN_DT_S` 钳位, 避免长时间停更后一次性推进一大步.
 - [x] 错误位覆盖运动学异常与轮离线.
 - [x] 严重故障置错误位并通知已注册回调, 故障路径不调用日志宏.
+- [x] 不提供坡度前馈, 阻力前馈与裁判系统功率限制接口. 相关配置开关已从 `config.h` 移除, 后续若需要功率控制另立任务.
 
 ### M6 `module/gimbal/` 与 `module/shoot/`
 
@@ -380,7 +379,7 @@ clang-format --dry-run --Werror public/Inc/nerv_status.h
 ## 7. 待确认的问题
 
 - [ ] 电机型号与协议: 目标电机列表, 电调型号, 帧 ID 分配, 反馈字段比例与量程, 各机型减速比. 减速比等硬件参数由使用者在实例配置中逐台填写, 不设库级默认.
-- [ ] 底盘构型: 已定为全向轮 (`config.h` 默认 `NERV_CHASSIS_TYPE_OMNI`), 4 个轮向电机, 轮号 0 到 3 为左前, 左后, 右后, 右前; 轮径, 轮距, 电机型号, 减速比与扭矩常数待定. 控制框架为三层串级: 运动学正解算, 平移与旋转速度环 (输出牵引力与转矩), 力分解与前馈叠加, 不设舵向电机.
+- [x] 底盘构型: 已定为全向轮 (`config.h` 默认 `NERV_CHASSIS_TYPE_OMNI`), 4 个轮向电机, 轮号 0 到 3 为左前, 左后, 右后, 右前. 控制框架为串级速控: 运动学正解算, 平移与旋转速度环 (输出修正后的速度指令), 轮速逆解, 每轮速度环输出电流. 轮径, 轮距, 电机型号, 减速比与扭矩常数由使用者按实车填写.
 - [ ] 云台形态: 两轴还是三轴, 限位来源, 是否有双板.
 - [ ] 发射机构形态: 摩擦轮与进弹机构的组合, 卡弹判定依据.
 - [ ] 板间通信: 底盘, 云台, 发射之间的链路拓扑与报文走向.

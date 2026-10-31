@@ -16,5 +16,6 @@ Thumbs.db
 .vscode/
 .idea/
 .codebuddy/
+.cache/
 
 demo/

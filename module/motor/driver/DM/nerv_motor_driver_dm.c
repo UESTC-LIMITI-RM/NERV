@@ -63,7 +63,7 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_MIT,
+    .control_mode                = NERV_MOTOR_CONTROL_MIT,
     .torque_constant_n_m_per_a   = 1.2f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
@@ -93,7 +93,7 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_SCALAR,
+    .control_mode                = NERV_MOTOR_CONTROL_SCALAR,
     .torque_constant_n_m_per_a   = 1.2f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
@@ -124,7 +124,7 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .fb_control_cmd_limit        = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
-    .control_mode                = (uint8_t)NERV_MOTOR_CONTROL_POSITION_VELOCITY,
+    .control_mode                = NERV_MOTOR_CONTROL_POSITION_VELOCITY,
     .torque_constant_n_m_per_a   = 1.2f,
     .rated_gear_ratio            = 10.0f,
     .fb_torque_present           = true,
@@ -298,7 +298,7 @@ static NERV_StatusTypeDef NERV_Motor_Dm_EncodeTx(const NERV_Motor_ModelTypeDef *
         return NERV_OK;
     }
 
-    if (NERV_MOTOR_CONTROL_POSITION_VELOCITY == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_POSITION_VELOCITY == model->control_mode)
     {
         union
         {

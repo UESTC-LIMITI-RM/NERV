@@ -754,12 +754,12 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         }
     }
 
-    if (model->control_mode > (uint8_t)NERV_MOTOR_CONTROL_POSITION_VELOCITY)
+    if (model->control_mode > NERV_MOTOR_CONTROL_POSITION_VELOCITY)
     {
         return NERV_ERROR;
     }
 
-    if (NERV_MOTOR_CONTROL_SCALAR == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_SCALAR == model->control_mode)
     {
         /* 标量模式驱动的量程字段可能位于 control.scalar 或 control.profile,
            两类驱动各自使用其中一套. */
@@ -784,7 +784,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         }
     }
 
-    if (NERV_MOTOR_CONTROL_MIT == (NERV_Motor_ControlKindTypeDef)model->control_mode)
+    if (NERV_MOTOR_CONTROL_MIT == model->control_mode)
     {
         if (!isfinite(model->control.profile.t_max_n_m) ||
             (model->control.profile.t_max_n_m <= 0.0f) ||

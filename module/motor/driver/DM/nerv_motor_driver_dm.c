@@ -18,6 +18,8 @@
 #include "nerv_motor_driver.h"
 #include "nerv_status.h"
 
+#if (NERV_USE_MOTOR == NERV_ENABLE) && (NERV_USE_MOTOR_DM == NERV_ENABLE)
+
 /** @brief 达妙特殊命令码, 占用 8 字节帧的最后一字节, 前 7 字节为 0xFF. */
 #define __NERV_DM_CMD_CLEAR_ERROR 0xFBU
 #define __NERV_DM_CMD_ENABLE      0xFCU
@@ -37,8 +39,6 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SetMode(const NERV_FDCAN_InstanceTypeDef
                                                 const NERV_Motor_ModelTypeDef *model,
                                                 uint8_t device_id,
                                                 NERV_Motor_ControlKindTypeDef mode);
-
-#if (NERV_USE_MOTOR == NERV_ENABLE) && (NERV_USE_MOTOR_DM == NERV_ENABLE)
 
 #define __NERV_DM_FRAME_LEN 8U
 #define __NERV_DM_POS_MAX   65535.0f

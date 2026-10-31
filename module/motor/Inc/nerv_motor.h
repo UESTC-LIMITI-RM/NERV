@@ -53,13 +53,13 @@ typedef struct
   * @brief  电机测量值, 机构系.
   * @note   角度与角速度已按减速比换算到输出轴, 角度, 角速度与电流按安装方向
   *         取反, 温度原值透传, 正方向为机构正方向.
-  * @note   角度范围为 [0, 2π), 不做多圈累积. 需要连续位置时由调用方用 NERV_Math_Wrap
-  *         计算增量后自行累积.
+  * @note   角度不做归一化, 原样保留驱动解码出的量并只做减速比与方向换算. 达妙反馈
+  *         落在 ±P_MAX, DJI 编码器量本身落在 [0, 2π). 
   * @note   temperature_c 为 INT8_MIN 表示该型号无温度字段, 见 NERV_MOTOR_FB_OFF_NONE.
   */
 typedef struct NERV_Motor_Measurement
 {
-    float angle_rad;   /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 范围 [0, 2π) */
+    float angle_rad;   /**< 输出轴机械角度, 单位 rad, 机构正方向为正, 未归一化 */
     float speed_radps; /**< 输出轴角速度, 单位 rad/s, 机构正方向为正 */
     float torque_n_m; /**< 输出轴转矩, 单位 N·m, 机构正方向为正. 型号不直接上报时由
                                电流乘扭矩常数换算, 型号未提供扭矩常数时为 0 */

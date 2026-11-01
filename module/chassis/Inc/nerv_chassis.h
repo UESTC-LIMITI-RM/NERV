@@ -101,10 +101,14 @@ typedef struct
     float max_translate_accel_mps2; /**< 平移加速度限幅, 单位 m/s², 0 表示不额外限幅 */
     float max_rotate_accel_radps2;  /**< 旋转加速度限幅, 单位 rad/s², 0 表示不额外限幅 */
     const NERV_PID_ConfigTypeDef
-        *translate_pid; /**< 平移速度环 PID 配置指针, x轴和y轴共用, 生命周期须覆盖实例 */
-    const NERV_PID_ConfigTypeDef *rotate_pid; /**< 旋转速度环 PID 配置指针, 生命周期须覆盖实例 */
+        *translate_pid; /**< 平移速度环 PID 配置指针, x轴和y轴共用, 输出为速度修正量,
+                             单位 m/s, 生命周期须覆盖实例 */
     const NERV_PID_ConfigTypeDef
-        *wheel_pid; /**< 轮速环 PID 配置指针, 每轮一份, 生命周期须覆盖实例 */
+        *rotate_pid; /**< 旋转速度环 PID 配置指针, 输出为角速度修正量, 单位 rad/s,
+                          生命周期须覆盖实例 */
+    const NERV_PID_ConfigTypeDef
+        *wheel_pid; /**< 轮速环 PID 配置指针, 每轮一份, 输出为电流, 单位 A, 增益与
+                         限幅按安培域配置, 生命周期须覆盖实例 */
 } NERV_Chassis_ConfigTypeDef;
 
 /**

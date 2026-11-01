@@ -44,8 +44,8 @@ typedef struct
         offline_ms; /**< 离线判定阈值, 单位 ms, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭离线判定 */
     float
         over_temperature_c; /**< 电机过温阈值, 单位 ℃, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭过温检查 */
-    uint16_t
-        control_limit; /**< 控制量编码值上限, 量纲与型号描述符的 control_cmd_limit 相同 (如 16384, 25000), 全型号统一按编码值配置, 取 NERV_DISABLE 表示不额外限幅 */
+    float control_limit; /**< 控制量物理量上限, 单位与型号描述符的 scalar_quantity 一致
+                              (电流为 A, 电压为 V, 转速为 rad/s), 取 0 表示不额外限幅 */
     bool invert_direction; /**< 安装方向取反, 指令与反馈统一乘符号 */
 } NERV_Motor_ConfigTypeDef;
 
@@ -54,7 +54,7 @@ typedef struct
   * @note   角度与角速度已按减速比换算到输出轴, 角度, 角速度与电流按安装方向
   *         取反, 温度原值透传, 正方向为机构正方向.
   * @note   角度不做归一化, 原样保留驱动解码出的量并只做减速比与方向换算. 达妙反馈
-  *         落在 ±P_MAX, DJI 编码器量本身落在 [0, 2π). 
+  *         落在 ±P_MAX, DJI 编码器量本身落在 [0, 2π).
   * @note   temperature_c 为 INT8_MIN 表示该型号无温度字段, 见 NERV_MOTOR_FB_OFF_NONE.
   */
 typedef struct NERV_Motor_Measurement
@@ -82,29 +82,28 @@ typedef struct NERV_Motor_Instance
     NERV_Motor_ConfigTypeDef config; /**< 配置, 由 NERV_Motor_Init 绑定, 之后只读 */
 
     NERV_Motor_FbTypeDef fb;                   /**< 原始反馈, 转子量, 由 NERV_Motor_OnRx 写入 */
-    NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_Update 刷新 */
+    NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_UpdateGroup 刷新 */
     uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_ReadError 读取 */
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */
-    NERV_Motor_ControlTypeDef target_control;  /**< 控制目标, 由 SetTarget 或 SetControl 写入 */
+    NERV_Motor_ControlTypeDef target_control;  /**< 控制目标, 由 NERV_Motor_SetControl 写入 */
     uint32_t last_rx_ms;                       /**< 最近一次有效反馈的时刻, 单位 ms */
     bool offline_armed;                        /**< 离线监督已建立计时起点, 由模块维护 */
     bool initialized;                          /**< 初始化完成标志, 由 NERV_Motor_Init 置位 */
-    bool fb_fresh;                             /**< 有新反馈待结算, 中断置位, Update 清除 */
+    bool fb_fresh;                             /**< 有新反馈待结算, 中断置位, UpdateGroup 清除 */
 } NERV_Motor_InstanceTypeDef;
 
 /* 调用顺序: NERV_Motor_Init 用配置建立实例, 之后周期调用 NERV_Motor_UpdateGroup
- * 完成测量值刷新, 监督与指令发送. 单个实例的测量值刷新与监督可单独调用
- * NERV_Motor_Update. 反馈经 NERV_Motor_OnRx 进入. 完整契约见各函数定义处. */
+ * 完成测量值刷新, 监督与指令发送, 这是唯一发送指令的入口. 反馈经 NERV_Motor_OnRx
+ * 进入. 完整契约见各函数定义处. */
 
 NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
                                    const NERV_Motor_ConfigTypeDef *config);
 
-NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target);
-
 NERV_StatusTypeDef NERV_Motor_SetControl(NERV_Motor_InstanceTypeDef *self,
                                          const NERV_Motor_ControlTypeDef *control);
 
-NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms);
+bool NERV_Motor_Supports(const NERV_Motor_InstanceTypeDef *self,
+                         NERV_Motor_CapabilityTypeDef capability);
 
 NERV_StatusTypeDef NERV_Motor_UpdateGroup(NERV_Motor_InstanceTypeDef *const *members, uint8_t count,
                                           uint32_t now_ms);

@@ -133,8 +133,6 @@ typedef struct
     bool fb_bit_packed;               /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
     bool
         tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id (不减去 id_min), false 表示按低组/高组选帧 */
-    bool
-        rx_id_offset_by_device; /**< true 表示反馈帧标识符等于 rx_id_base 加设备 id, false 表示固定为 rx_id_base */
     float torque_constant_n_m_per_a; /**< 手册给出的扭矩常数, 单位 N·m/A, 0 表示未提供 */
     float rated_gear_ratio;          /**< 手册标称减速比, 无减速箱填 1, 必须大于 0 */
     bool fb_torque_present; /**< true 表示反馈直接给出转矩, false 表示由电流乘扭矩常数换算 */
@@ -201,9 +199,10 @@ typedef enum
   * @note   每个协议族一个操作表常量, 由该族的驱动源文件给出. 同一次编译允许混用
   *         多个协议族的多个型号, 主逻辑不包含型号分支.
   * @note   成员契约:
-  *         - get_frame_geo: 由设备 id 给出控制帧标识符, 反馈帧标识符与帧长.
-  *                          model 或 geo 为 NULL, device_id 越界时返回 NERV_ERROR
-  *                          且不修改 geo. ISR-safe.
+  *         - get_frame_geo: 由设备 id 与 master_id 给出控制帧标识符, 反馈帧标识符与帧长.
+  *                          master_id 是调用方配置的电调反馈标识符, 电调不可配置反馈
+  *                          标识符的协议族忽略本参数. model 或 geo 为 NULL, device_id
+  *                          越界时返回 NERV_ERROR 且不修改 geo. ISR-safe.
   *         - encode_tx: 把一个设备的控制目标编码到控制帧内该设备对应的位置, 帧缓冲
   *                       由调用方清零后传入, 驱动只写入该设备占用的字节, 失败时不
   *                       修改帧缓冲. SCALAR 分支的输入是物理量, 由驱动换算为编码后
@@ -228,7 +227,7 @@ typedef enum
 typedef struct
 {
     NERV_StatusTypeDef (*get_frame_geo)(const NERV_Motor_ModelTypeDef *model, uint8_t device_id,
-                                        NERV_Motor_FrameGeoTypeDef *geo);
+                                        uint32_t master_id, NERV_Motor_FrameGeoTypeDef *geo);
     NERV_StatusTypeDef (*encode_tx)(const NERV_Motor_ModelTypeDef *model, uint8_t *frame,
                                     uint8_t device_id, const NERV_Motor_ControlTypeDef *control);
     NERV_StatusTypeDef (*decode_fb)(const NERV_Motor_ModelTypeDef *model, const uint8_t *frame,

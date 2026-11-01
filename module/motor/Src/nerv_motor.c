@@ -21,7 +21,6 @@
 
 #if (NERV_USE_MOTOR == NERV_ENABLE)
 
-/* 内部实现常数. */
 #define __NERV_MOTOR_DIRECTION_SIGN_INVERTED (-1.0f)
 #define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
 #define __NERV_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
@@ -56,6 +55,8 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
   *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
   *         control_limit 为负或非有限值, device_id 超出描述符的 id_min 到 id_max 范围,
   *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
+  * @note   帧几何信息由驱动按配置的 device_id 与 master_id 派生, 反馈帧标识符的取值
+  *         方式由协议族决定.
   * @note   不直接访问外设: 电调无需初始化指令, 帧几何信息只经驱动操作表派生.
   *         调用点仍应按 FDCAN 启动之后安排.
   * @note   校验与几何派生全部在修改 self 之前完成, 失败时 self 保持原状.
@@ -101,8 +102,8 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if (NERV_OK !=
-        config->driver->ops->get_frame_geo(config->driver->model, config->device_id, &geo))
+    if (NERV_OK != config->driver->ops->get_frame_geo(config->driver->model, config->device_id,
+                                                      config->master_id, &geo))
     {
         return NERV_ERROR;
     }

@@ -25,7 +25,7 @@
 #define __NERV_MOTOR_DIRECTION_SIGN_INVERTED (-1.0f)
 #define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
 #define __NERV_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
-#define __NERV_MOTOR_CONTROL_LIMIT_MAX       32767U
+#define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
 
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
@@ -52,9 +52,9 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
   * @param  config 配置指针, 不得为 NULL. 内容被复制, 调用方保留所有权.
   * @retval NERV_OK 配置已绑定, 帧几何信息已缓存, 实例进入就绪状态.
   * @retval NERV_ERROR self 或 config 为 NULL, config 的 driver, driver 的 model,
-  *         driver 的 ops 或 bus 为 NULL, ops 的任一操作指针为空,
+  *         driver 的 ops 或 bus 为 NULL, 或 ops 的必需操作指针为空,
   *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
-  *         control_limit 超过 32767, device_id 超出描述符的 id_min 到 id_max 范围,
+  *         control_limit 为负或非有限值, device_id 超出描述符的 id_min 到 id_max 范围,
   *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
   * @note   不直接访问外设: 电调无需初始化指令, 帧几何信息只经驱动操作表派生.
   *         调用点仍应按 FDCAN 启动之后安排.
@@ -76,9 +76,7 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
     if ((NULL == config->driver) || (NULL == config->driver->model) ||
         (NULL == config->driver->ops) || (NULL == config->driver->ops->get_frame_geo) ||
         (NULL == config->driver->ops->encode_tx) || (NULL == config->driver->ops->decode_fb) ||
-        (NULL == config->driver->ops->enable) || (NULL == config->driver->ops->disable) ||
-        (NULL == config->driver->ops->clear_fault) || (NULL == config->driver->ops->set_mode) ||
-        (NULL == config->driver->ops->save_zero) || (NULL == config->bus))
+        (NULL == config->bus))
     {
         return NERV_ERROR;
     }
@@ -93,7 +91,7 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if (config->control_limit > __NERV_MOTOR_CONTROL_LIMIT_MAX)
+    if (!isfinite(config->control_limit) || (config->control_limit < 0.0f))
     {
         return NERV_ERROR;
     }
@@ -126,12 +124,15 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
 }
 
 /**
-  * @brief  设置多字段控制目标.
+  * @brief  设置控制目标.
   * @param  self 实例指针, 不得为 NULL.
   * @param  control 控制目标, 不得为 NULL. 按 kind 校验对应分支.
   * @retval NERV_OK 目标已保存.
-  * @retval NERV_ERROR self 或 control 为 NULL, 实例未初始化, kind 不受支持, 或字段非法.
-  * @note   MIT 分支要求 position, velocity, kp, kd, torque 均为有限值, 且 kp, kd 非负.
+  * @retval NERV_ERROR self 或 control 为 NULL, 实例未初始化, kind 与型号的控制模式
+  *         不一致, 或字段非法.
+  * @note   SCALAR 分支的 scalar 为物理量, 单位由型号描述符的 scalar_quantity 决定,
+  *         编码换算由驱动完成. MIT 分支要求 position, velocity, kp, kd, torque 均为
+  *         有限值, 且 kp, kd 非负.
   * @note   本函数不限幅. 实例限幅与协议满量程限幅在发送时进行.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -150,6 +151,11 @@ NERV_StatusTypeDef NERV_Motor_SetControl(NERV_Motor_InstanceTypeDef *self,
     }
 
     if (!self->initialized)
+    {
+        return NERV_ERROR;
+    }
+
+    if (control->kind != self->config.driver->model->control_mode)
     {
         return NERV_ERROR;
     }
@@ -191,50 +197,63 @@ NERV_StatusTypeDef NERV_Motor_SetControl(NERV_Motor_InstanceTypeDef *self,
 }
 
 /**
-  * @brief  设置单一控制量目标, 等价于 SCALAR 分支.
-  * @param  self 实例指针, 不得为 NULL.
-  * @param  target 控制量目标, 单位与语义由型号描述符约定, 必须为有限值.
-  * @retval NERV_OK 目标已保存.
-  * @retval NERV_ERROR self 为 NULL, 实例未初始化, 或 target 为非有限值.
-  * @note   本函数不限幅. 实例限幅与协议满量程限幅在发送时进行.
-  * @note   NOT ISR-safe.
-  * @note   caller-synchronized.
+  * @brief  查询驱动是否支持某项可选能力.
+  * @param  self 实例指针, 可以为 NULL.
+  * @param  capability 待查询的能力.
+  * @return 操作表中对应函数指针非空时为 true, 否则为 false.
+  * @note   能力以函数指针是否为空为唯一依据. self 为 NULL 或未初始化时一律返回 false.
+  * @note   ISR-safe.
   */
-NERV_StatusTypeDef NERV_Motor_SetTarget(NERV_Motor_InstanceTypeDef *self, float target)
+bool NERV_Motor_Supports(const NERV_Motor_InstanceTypeDef *self,
+                         NERV_Motor_CapabilityTypeDef capability)
 {
-    NERV_Motor_ControlTypeDef control;
+    const NERV_Motor_Driver_OpsTypeDef *ops;
 
-    if (NULL == self)
+    if ((NULL == self) || (!self->initialized) || (NULL == self->config.driver) ||
+        (NULL == self->config.driver->ops))
     {
-        return NERV_ERROR;
+        return false;
     }
 
-    if (!isfinite(target))
+    ops = self->config.driver->ops;
+
+    switch (capability)
     {
-        return NERV_ERROR;
+    case NERV_MOTOR_CAP_ENABLE:
+        return (NULL != ops->enable);
+
+    case NERV_MOTOR_CAP_DISABLE:
+        return (NULL != ops->disable);
+
+    case NERV_MOTOR_CAP_CLEAR_FAULT:
+        return (NULL != ops->clear_fault);
+
+    case NERV_MOTOR_CAP_SET_MODE:
+        return (NULL != ops->set_mode);
+
+    case NERV_MOTOR_CAP_SAVE_ZERO:
+        return (NULL != ops->save_zero);
+
+    default:
+        return false;
     }
-
-    control.kind     = NERV_MOTOR_CONTROL_SCALAR;
-    control.u.scalar = target;
-
-    return NERV_Motor_SetControl(self, &control);
 }
 
 /**
-  * @brief  刷新机构系测量值并执行离线与过温监督, 不发送指令.
+  * @brief  刷新单个成员的机构系测量值并执行离线与过温监督, 不发送指令.
   * @param  self 实例指针, 不得为 NULL.
   * @param  now_ms 当前时刻, 单位 ms. 由调用方提供, 库不读取硬件时钟.
   * @retval NERV_OK 状态已刷新, 监督已执行.
   * @retval NERV_ERROR self 为 NULL 或实例未初始化.
+  * @note   由 NERV_Motor_UpdateGroup 逐成员调用, 不对外暴露.
   * @note   监督结果写入错误位, 不通过返回值报告. 错误位为粘滞, 只由
   *         NERV_Motor_ClearError 清除.
   * @note   NERV_Motor_ConvertFb 失败分支为防御性保留: 已初始化实例的输入恒有效,
   *         该分支实际不可达. 若未来引入会失败的换算校验, 失败时本周期不执行监督.
-  * @note   指令发送由 NERV_Motor_UpdateGroup 完成.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
   */
-NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms)
+static NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t now_ms)
 {
     if (NULL == self)
     {
@@ -258,6 +277,8 @@ NERV_StatusTypeDef NERV_Motor_Update(NERV_Motor_InstanceTypeDef *self, uint32_t 
 
 /**
   * @brief  更新一组电机: 逐成员刷新状态与监督, 按总线与指令帧标识符分组发送.
+  * @note   本函数是唯一发送指令的入口. 逐成员先执行 NERV_Motor_Update 刷新测量值与
+  *         监督, 再按组编码并发送, 调用方不需要也不应该单独刷新单个成员.
   * @param  members 实例指针数组, 不得为 NULL. 每个元素不得为 NULL 且必须已初始化.
   * @param  count 数组元素个数, 必须大于 0.
   * @param  now_ms 当前时刻, 单位 ms.
@@ -408,7 +429,7 @@ void NERV_Motor_OnRx(NERV_Motor_InstanceTypeDef *self, const NERV_FDCAN_FrameTyp
   * @param  measurement 输出测量值, 不得为 NULL. 失败时不修改.
   * @retval NERV_OK 测量值已写入 measurement.
   * @retval NERV_ERROR self 或 measurement 为 NULL, 或实例未初始化.
-  * @note   测量值由 NERV_Motor_Update 或 NERV_Motor_UpdateGroup 刷新, 读取发生在
+  * @note   测量值由 NERV_Motor_UpdateGroup 刷新, 读取发生在
   *         任务上下文. 收到第一次反馈之前为初始零值.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -474,11 +495,13 @@ void NERV_Motor_ClearError(NERV_Motor_InstanceTypeDef *self, uint32_t mask)
   * @param  self 实例指针, 不得为 NULL.
   * @retval NERV_OK 目标已清零.
   * @retval NERV_ERROR self 为 NULL 或实例未初始化.
+  * @note   零目标按型号描述符的 control_mode 生成: SCALAR 型号标量清零, MIT 型号
+  *         位置, 速度, 刚度, 阻尼与前馈转矩全部清零, 位置速度型号两个字段清零.
   * @note   控制输出由目标派生, 本函数不保存独立输出值. 零指令随下一个
   *         NERV_Motor_UpdateGroup 发送, 之间电调保持最后收到的指令. 需要立即输出时,
   *         调用本函数后立即执行一次 NERV_Motor_UpdateGroup.
   * @note   本函数不直接切断电调供电, 也不依赖总线发送成功. 离线监督在下一个
-  *         NERV_Motor_Update 或 NERV_Motor_UpdateGroup 时重新建立计时起点.
+  *         NERV_Motor_UpdateGroup 时重新建立计时起点.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
   */
@@ -494,9 +517,9 @@ NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
-    self->target_control.kind     = NERV_MOTOR_CONTROL_SCALAR;
-    self->target_control.u.scalar = 0.0f;
-    self->offline_armed           = false;
+    self->target_control      = (NERV_Motor_ControlTypeDef){0};
+    self->target_control.kind = self->config.driver->model->control_mode;
+    self->offline_armed       = false;
 
     return NERV_OK;
 }
@@ -670,8 +693,8 @@ static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self)
     self->geo.rx_id                 = 0U;
     self->geo.len                   = 0U;
     self->error                     = 0U;
-    self->target_control.kind       = NERV_MOTOR_CONTROL_SCALAR;
-    self->target_control.u.scalar   = 0.0f;
+    self->target_control            = (NERV_Motor_ControlTypeDef){0};
+    self->target_control.kind       = self->config.driver->model->control_mode;
     self->last_rx_ms                = 0U;
     self->offline_armed             = false;
     self->initialized               = false;
@@ -750,7 +773,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
     if (!model->fb_bit_packed)
     {
         if (!isfinite(model->fb_control_full_scale) || (model->fb_control_full_scale <= 0.0f) ||
-            (model->fb_control_cmd_limit <= 0))
+            (model->fb_control_cmd_limit_raw <= 0))
         {
             return NERV_ERROR;
         }
@@ -767,7 +790,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
            两类驱动各自使用其中一套. */
         const bool scalar_ok  = isfinite(model->control.scalar.full_scale) &&
                                 (model->control.scalar.full_scale > 1.0e-3f) &&
-                                (model->control.scalar.cmd_limit > 0);
+                                (model->control.scalar.cmd_limit_raw > 0);
         const bool profile_ok = isfinite(model->control.profile.v_max_radps) &&
                                 (model->control.profile.v_max_radps > 1.0e-3f);
         if (!scalar_ok && !profile_ok)
@@ -854,10 +877,10 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
   * @return 已按安装方向取反并按 control_limit 限幅的控制目标.
   * @note   方向取反只作用于物理量分支: SCALAR 的 scalar, MIT 的 position,
   *         velocity 与 torque, VELOCITY 的 velocity_radps; kp 与 kd 不取反.
-  * @note   control_limit 只约束 SCALAR 分支的编码, 与型号描述符的
-  *         control.scalar.cmd_limit 同量纲 (如 16384, 25000). MIT 的范围由
-  *         control.profile 的 p_max_rad, v_max_radps, t_max_n_m 约束.
-  * @note   control_limit 为 NERV_DISABLE 时跳过实例限幅, 协议满量程限幅由驱动完成.
+  * @note   control_limit 只约束 SCALAR 分支, 单位与型号描述符的 scalar_quantity
+  *         一致 (电流为 A, 电压为 V, 转速为 rad/s), 是使用者额外加的上限. MIT 的范围
+  *         由 control.profile 的 p_max_rad, v_max_radps, t_max_n_m 约束.
+  * @note   control_limit 为 0 时跳过实例限幅, 协议满量程限幅由驱动在编码时完成.
   */
 static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_InstanceTypeDef *self)
 {
@@ -872,10 +895,10 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
     case NERV_MOTOR_CONTROL_SCALAR:
         control.u.scalar *= sign;
 
-        if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.control_limit))
+        if (__NERV_MOTOR_CONFIG_ACTIVE_F(self->config.control_limit))
         {
-            control.u.scalar = NERV_Math_Clamp(control.u.scalar, -(float)self->config.control_limit,
-                                               (float)self->config.control_limit);
+            control.u.scalar = NERV_Math_Clamp(control.u.scalar, -self->config.control_limit,
+                                               self->config.control_limit);
         }
         break;
 

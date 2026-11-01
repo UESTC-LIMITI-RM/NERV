@@ -203,6 +203,7 @@ static void NERV_Motor_Dji_WriteBE16(uint8_t *data, uint8_t offset, uint16_t val
   * @brief  由设备 id 给出帧几何信息.
   * @param  model 型号描述符, 不得为 NULL.
   * @param  device_id 电调 id, 范围 model 的 id_min 到 id_max.
+  * @param  master_id 电调侧配置的反馈帧标识符, DJI 电调不可配置, 本函数不使用.
   * @param  geo 输出帧几何信息, 不得为 NULL. 失败时不修改.
   * @retval NERV_OK 几何信息已写入 geo.
   * @retval NERV_ERROR model 或 geo 为 NULL, 或 device_id 越界.
@@ -211,10 +212,12 @@ static void NERV_Motor_Dji_WriteBE16(uint8_t *data, uint8_t offset, uint16_t val
   * @note   ISR-safe.
   */
 static NERV_StatusTypeDef NERV_Motor_Dji_GetFrameGeo(const NERV_Motor_ModelTypeDef *model,
-                                                     uint8_t device_id,
+                                                     uint8_t device_id, uint32_t master_id,
                                                      NERV_Motor_FrameGeoTypeDef *geo)
 {
     uint8_t index;
+
+    (void)master_id;
 
     if ((NULL == model) || (NULL == geo))
     {

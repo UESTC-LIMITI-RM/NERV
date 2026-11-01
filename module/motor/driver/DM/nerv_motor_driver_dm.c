@@ -62,7 +62,6 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .fb_control_full_scale       = 30.0f,
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
-    .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_MIT,
     .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
@@ -92,7 +91,6 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .fb_control_full_scale       = 30.0f,
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
-    .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_SCALAR,
     .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
@@ -123,7 +121,6 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .fb_control_full_scale       = 30.0f,
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
-    .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_POSITION_VELOCITY,
     .torque_constant_n_m_per_a   = 0.12f,
     .rated_gear_ratio            = 10.0f,
@@ -181,16 +178,17 @@ static uint32_t NERV_Motor_Dm_EncodeUnipolar(float value, float max_value, uint3
   * @brief  由设备 id 给出控制帧标识符, 反馈帧标识符与帧长.
   * @param  model 型号描述符, 不得为 NULL.
   * @param  device_id 电机 CAN ID, 范围 model 的 id_min 到 id_max.
+  * @param  master_id 电调侧配置的反馈帧标识符, 直接写入 geo 的 rx_id.
   * @param  geo 输出帧几何, 不得为 NULL.
   * @retval NERV_OK 已写入.
   * @retval NERV_ERROR 参数为 NULL 或设备 id 越界.
   * @note   控制帧标识符等于 tx_id_low 加设备 id (MIT 模式基值 0x000, 速度模式 0x200).
-  *         反馈帧标识符等于 rx_id_base 加设备 id, 要求每个电机的 Master ID 配置为
-  *         0x000 加自身 CAN ID, 否则多电机共用同一 Master ID 会互相误收.
+  * @note   反馈帧标识符取 master_id, 由调用方按电调实际配置填写. 同一总线上的多个
+  *         实例必须填写互不相同的值, 否则同一反馈帧会被多个实例解码.
   * @note   ISR-safe.
   */
 static NERV_StatusTypeDef NERV_Motor_Dm_GetFrameGeo(const NERV_Motor_ModelTypeDef *model,
-                                                    uint8_t device_id,
+                                                    uint8_t device_id, uint32_t master_id,
                                                     NERV_Motor_FrameGeoTypeDef *geo)
 {
     if ((NULL == model) || (NULL == geo))
@@ -204,7 +202,7 @@ static NERV_StatusTypeDef NERV_Motor_Dm_GetFrameGeo(const NERV_Motor_ModelTypeDe
     }
 
     geo->tx_id = model->tx_id_low + (uint32_t)device_id;
-    geo->rx_id = model->rx_id_base + ((model->rx_id_offset_by_device) ? (uint32_t)device_id : 0U);
+    geo->rx_id = master_id;
     geo->len   = model->frame_len;
 
     return NERV_OK;
@@ -457,7 +455,7 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
         return NERV_ERROR;
     }
 
-    if (NERV_OK != NERV_Motor_Dm_GetFrameGeo(model, device_id, &geo))
+    if (NERV_OK != NERV_Motor_Dm_GetFrameGeo(model, device_id, 0U, &geo))
     {
         return NERV_ERROR;
     }

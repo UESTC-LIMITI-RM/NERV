@@ -38,8 +38,13 @@ typedef struct
 {
     const NERV_Motor_DriverTypeDef *driver; /**< 驱动绑定, 决定协议族与控制模式 */
     const NERV_FDCAN_InstanceTypeDef *bus;  /**< FDCAN 实例, 指令发送与反馈接收的通道 */
-    uint8_t device_id; /**< 电调 id, 合法范围由驱动描述符的 id_min 与 id_max 决定 */
-    float gear_ratio;  /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
+    uint8_t device_id;  /**< 电调 id, 合法范围由驱动描述符的 id_min 与 id_max 决定 */
+    uint32_t master_id; /**< 电调侧配置的反馈帧标识符, 由驱动写入帧几何信息.
+                             电调可独立配置反馈标识符的协议族按本值匹配反馈帧, 同一总线上的
+                             多个实例必须填写互不相同的值, 否则同一帧会被多个实例解码.
+                             电调不可配置反馈标识符的协议族忽略本字段, 由型号与 device_id
+                             推导, 例如 DJI. 取值可以为 0, 与达妙电调的出厂默认一致 */
+    float gear_ratio;   /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
     uint32_t
         offline_ms; /**< 离线判定阈值, 单位 ms, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭离线判定 */
     float

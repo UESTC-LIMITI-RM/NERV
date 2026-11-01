@@ -84,7 +84,6 @@ NERV/
 │   │   ├── Src/
 │   │   └── driver/
 │   │       ├── nerv_motor_driver.h
-│   │       ├── nerv_motor_driver.c
 │   │       ├── DM/
 │   │       │   └── nerv_motor_driver_dm.c
 │   │       └── DJI/
@@ -322,6 +321,16 @@ _Static_assert(NERV_ERR_MOTOR_OFFLINE != NERV_ERR_MOTOR_OVER_TEMP,
 | 时间   | s 或 ms 或 us | `_s` 或 `_ms` 或 `_us` | `dt_s`, `timeout_ms` |
 | 温度   | ℃             | `_c`                   | `temp_c`             |
 | 质量   | kg            | `_kg`                  | `mass_kg`            |
+
+物理量与协议编码必须用后缀区分, 不得混用同一个名字:
+
+- 物理量使用上表的 SI 单位后缀, 例如 `drive_current_a`, `wheel_speed_radps`.
+- 协议编码值使用 `_raw` 后缀, 例如 `current_raw`, `cmd_limit_raw`.
+- 满量程字段名不带 `_raw` 时表示物理量, 例如 `control.scalar.full_scale` 的单位
+  由 `scalar_quantity` 决定.
+- 同一个字段在不同协议下量纲可能不同时, 必须由描述符的枚举字段声明量纲, 不靠命名
+  或注释约定. `NERV_Motor_ControlTypeDef` 的 `scalar` 是物理量, 编码换算由驱动在
+  `encode_tx` 内部完成, 调用方不做换算.
 
 ### 5.2 坐标系
 

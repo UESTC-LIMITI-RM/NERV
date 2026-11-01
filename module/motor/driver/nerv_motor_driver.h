@@ -58,8 +58,9 @@ typedef enum
   * @brief  电机控制目标.
   * @note   联合体只保留一份有效成员, 由 kind 标识. 各驱动只读取自己支持的分支,
   *         kind 不受支持时返回 NERV_ERROR.
-  * @note   SCALAR 分支用于只接受单一控制量的协议, 物理量由型号描述符的
-  *         control_full_scale 约定, 例如 M3508 是电流, 6020 电压版是电压;
+  * @note   SCALAR 分支用于只接受单一控制量的协议, 字段为物理量, 单位由型号
+  *         描述符的 scalar_quantity 决定, 例如 M3508 是电流 A, 6020 电压版是电压 V.
+  *         物理量到协议编码的换算由驱动在 encode_tx 内部完成, 调用方只给物理量.
   *         MIT 分支用于达妙等支持位置, 速度, 刚度, 阻尼与前馈转矩的协议.
   * @note   MIT 的 position_rad 与 velocity_radps 为转子量, kp 与 kd 为协议约定单位,
   *         torque_n_m 为前馈转矩, 单位 N·m.
@@ -69,7 +70,7 @@ typedef struct
     NERV_Motor_ControlKindTypeDef kind; /**< 有效分支标识 */
     union
     {
-        float scalar; /**< SCALAR 分支, 单位由型号描述符 control_full_scale 约定 */
+        float scalar; /**< SCALAR 分支, 物理量, 单位由型号描述符 scalar_quantity 决定 */
         struct
         {
             float position_rad;   /**< 目标位置, 单位 rad */
@@ -115,21 +116,21 @@ typedef enum
   */
 typedef struct
 {
-    uint32_t tx_id_low;           /**< 控制帧标识符, 设备 id 较小的一组 */
-    uint32_t tx_id_high;          /**< 控制帧标识符, 设备 id 较大的一组 */
-    uint32_t rx_id_base;          /**< 反馈帧标识符基值, 反馈标识符等于本值加设备 id */
-    uint8_t id_min;               /**< 设备 id 最小值 */
-    uint8_t id_max;               /**< 设备 id 最大值 */
-    uint8_t motors_per_frame;     /**< 单条控制帧控制的电机数量 */
-    uint8_t frame_len;            /**< 控制帧与反馈帧数据长度, 单位 byte */
-    uint8_t fb_angle_off;         /**< 反馈帧转子角度字段偏移, uint16 大端 */
-    uint8_t fb_speed_off;         /**< 反馈帧转速字段偏移, int16 大端 */
-    uint8_t fb_current_off;       /**< 反馈帧实际输出电流字段偏移, int16 大端 */
-    uint8_t fb_temperature_off;   /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
-    uint16_t angle_count;         /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
-    float fb_control_full_scale;  /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
-    int16_t fb_control_cmd_limit; /**< 反馈中控制量字段的编码满量程 */
-    bool fb_bit_packed;           /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
+    uint32_t tx_id_low;               /**< 控制帧标识符, 设备 id 较小的一组 */
+    uint32_t tx_id_high;              /**< 控制帧标识符, 设备 id 较大的一组 */
+    uint32_t rx_id_base;              /**< 反馈帧标识符基值, 反馈标识符等于本值加设备 id */
+    uint8_t id_min;                   /**< 设备 id 最小值 */
+    uint8_t id_max;                   /**< 设备 id 最大值 */
+    uint8_t motors_per_frame;         /**< 单条控制帧控制的电机数量 */
+    uint8_t frame_len;                /**< 控制帧与反馈帧数据长度, 单位 byte */
+    uint8_t fb_angle_off;             /**< 反馈帧转子角度字段偏移, uint16 大端 */
+    uint8_t fb_speed_off;             /**< 反馈帧转速字段偏移, int16 大端 */
+    uint8_t fb_current_off;           /**< 反馈帧实际输出电流字段偏移, int16 大端 */
+    uint8_t fb_temperature_off;       /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
+    uint16_t angle_count;             /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
+    float fb_control_full_scale;      /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
+    int16_t fb_control_cmd_limit_raw; /**< 反馈中控制量字段的编码满量程 */
+    bool fb_bit_packed;               /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
     bool
         tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id (不减去 id_min), false 表示按低组/高组选帧 */
     bool
@@ -144,8 +145,8 @@ typedef struct
     {
         struct
         {
-            float full_scale;  /**< 单一控制量满量程, 单位由协议族约定 */
-            int16_t cmd_limit; /**< 单一控制量编码满量程 */
+            float full_scale;      /**< 单一控制量满量程, 单位由协议族约定 */
+            int16_t cmd_limit_raw; /**< 单一控制量编码满量程, 与 full_scale 的物理量对应 */
         } scalar;
         struct
         {
@@ -160,13 +161,14 @@ typedef struct
 
 /**
   * @brief  把控制量物理量换算为电机控制编码.
-  * @note   线性比例 control.scalar.cmd_limit / control.scalar.full_scale. 物理量的单位
-  *         必须与 control.scalar.full_scale 一致 (电流模式为 A, 电压模式为协议给定值).
-  *         结果为有符号控制编码, 范围约 ±control.scalar.cmd_limit. 只适用于 SCALAR 控制
-  *         模式, 多字段模式由驱动自行换算.
+  * @note   线性比例 control.scalar.cmd_limit_raw / control.scalar.full_scale. 物理量的
+  *         单位必须与 control.scalar.full_scale 一致 (电流模式为 A, 电压模式为 V).
+  *         结果为有符号控制编码, 范围约 ±control.scalar.cmd_limit_raw. 只适用于
+  *         SCALAR 控制模式, 多字段模式由驱动自行换算.
+  * @note   供驱动在 encode_tx 内部使用, 调用方只给物理量, 不做换算.
   */
-#define NERV_Motor_ControlFromPhysical(_model, _physical)             \
-    ((float)(_physical) * (float)(_model)->control.scalar.cmd_limit / \
+#define NERV_Motor_ControlFromPhysical(_model, _physical)                 \
+    ((float)(_physical) * (float)(_model)->control.scalar.cmd_limit_raw / \
      (_model)->control.scalar.full_scale)
 
 /**
@@ -181,17 +183,17 @@ typedef struct
 } NERV_Motor_FrameGeoTypeDef;
 
 /**
-  * @brief  驱动可选能力, 每位一项能力, 可组合成位掩码.
-  * @note   驱动在描述符的 capabilities 中声明支持的能力, 核心层按位判断.
-  *         声明与操作表函数指针必须一致, NERV_Motor_Init 会交叉校验.
+  * @brief  驱动可选能力.
+  * @note   能力由操作表中对应函数指针是否为空表达, 空指针表示不支持. 本枚举只用于
+  *         NERV_Motor_Supports 的查询参数, 不参与描述符配置.
   */
 typedef enum
 {
-    NERV_MOTOR_CAP_ENABLE      = 1U << 0, /**< 使能 */
-    NERV_MOTOR_CAP_DISABLE     = 1U << 1, /**< 失能 */
-    NERV_MOTOR_CAP_CLEAR_FAULT = 1U << 2, /**< 清除故障 */
-    NERV_MOTOR_CAP_SET_MODE    = 1U << 3, /**< 运行期切换控制模式 */
-    NERV_MOTOR_CAP_SAVE_ZERO   = 1U << 4, /**< 保存当前位置为零点 */
+    NERV_MOTOR_CAP_ENABLE      = 0U, /**< 使能 */
+    NERV_MOTOR_CAP_DISABLE     = 1U, /**< 失能 */
+    NERV_MOTOR_CAP_CLEAR_FAULT = 2U, /**< 清除故障 */
+    NERV_MOTOR_CAP_SET_MODE    = 3U, /**< 运行期切换控制模式 */
+    NERV_MOTOR_CAP_SAVE_ZERO   = 4U, /**< 保存当前位置为零点 */
 } NERV_Motor_CapabilityTypeDef;
 
 /**
@@ -202,14 +204,26 @@ typedef enum
   *         - get_frame_geo: 由设备 id 给出控制帧标识符, 反馈帧标识符与帧长.
   *                          model 或 geo 为 NULL, device_id 越界时返回 NERV_ERROR
   *                          且不修改 geo. ISR-safe.
-  *         - encode_tx: 把一个设备的控制编码编码到控制帧内该设备对应的位置, 帧缓冲
+  *         - encode_tx: 把一个设备的控制目标编码到控制帧内该设备对应的位置, 帧缓冲
   *                       由调用方清零后传入, 驱动只写入该设备占用的字节, 失败时不
-  *                       修改帧缓冲. 本函数只按 control_cmd_limit 把控制编码限幅到
-  *                       协议满量程, 实例级限幅由调用方在调用前完成. ISR-safe.
+  *                       修改帧缓冲. SCALAR 分支的输入是物理量, 由驱动换算为编码后
+  *                       按 control.scalar.cmd_limit_raw 限幅到协议满量程, 实例级限幅
+  *                       由调用方在调用前完成. ISR-safe.
   *         - decode_fb: 把反馈帧解码为电机反馈, len 必须等于 model 的 frame_len,
   *                      失败时不修改输出结构. 温度按有符号 int8 透传, 型号无温度
   *                      字段时置 INT8_MIN. 型号不上报的电流, 转矩, MOS 温度与故障码
   *                      必须显式置 0 或 INT8_MIN, 不得保留未定义值. ISR-safe.
+  *         - enable, disable: 发送使能或失能命令, 不等待电调应答. 发送结果即返回值,
+  *                            NERV_OK 表示命令已交给总线, 不表示电调已执行.
+  *                            不支持时置 NULL. ISR-safe.
+  *         - clear_fault: 清除电调侧的故障锁存. 不支持时置 NULL. ISR-safe.
+  *         - save_zero: 把当前位置写为协议零点并掉电保存. 参数区擦写寿命有限,
+  *                      只能在标定零点时调用一次, 不得放入控制周期. 不支持时置
+  *                      NULL. ISR-safe.
+  *         - set_mode: 运行期切换电调控制模式, mode 必须是型号描述符 control_mode
+  *                     支持的值. 不支持时置 NULL. ISR-safe.
+  *         - 可选能力为 NULL 时, NERV_Motor 的对应函数返回 NERV_ERROR,
+  *           NERV_Motor_Supports 对该能力返回 false.
   */
 typedef struct
 {
@@ -220,7 +234,7 @@ typedef struct
     NERV_StatusTypeDef (*decode_fb)(const NERV_Motor_ModelTypeDef *model, const uint8_t *frame,
                                     uint8_t len, NERV_Motor_FbTypeDef *fb);
 
-    /* 可选能力, 驱动不支持时置 NULL, 核心层按空操作处理. */
+    /* 可选能力. 驱动不支持时置 NULL, NERV_Motor_Supports 据此返回 false. */
     NERV_StatusTypeDef (*enable)(const NERV_FDCAN_InstanceTypeDef *bus,
                                  const NERV_Motor_ModelTypeDef *model, uint8_t device_id);
     NERV_StatusTypeDef (*disable)(const NERV_FDCAN_InstanceTypeDef *bus,
@@ -241,19 +255,9 @@ typedef struct
   */
 typedef struct
 {
-    uint32_t capabilities;                   /**< NERV_MOTOR_CAP_* 位掩码, 声明支持的可选能力 */
     const NERV_Motor_Driver_OpsTypeDef *ops; /**< 协议族操作表 */
     const NERV_Motor_ModelTypeDef *model;    /**< 型号描述符 */
 } NERV_Motor_DriverTypeDef;
-
-NERV_StatusTypeDef NERV_Motor_Driver_NotSupported(const NERV_FDCAN_InstanceTypeDef *bus,
-                                                  const NERV_Motor_ModelTypeDef *model,
-                                                  uint8_t device_id);
-
-NERV_StatusTypeDef NERV_Motor_Driver_NotSupportedSetMode(const NERV_FDCAN_InstanceTypeDef *bus,
-                                                         const NERV_Motor_ModelTypeDef *model,
-                                                         uint8_t device_id,
-                                                         NERV_Motor_ControlKindTypeDef mode);
 
 /* 具体驱动声明, 由驱动层统一汇总, 使用者包含本文件即可拿到全部驱动常量. */
 #if (NERV_USE_MOTOR_DJI == NERV_ENABLE)

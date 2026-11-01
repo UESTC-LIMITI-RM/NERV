@@ -71,10 +71,32 @@ static void NERV_Chassis_UpdateOdometry(NERV_Chassis_InstanceTypeDef *self,
                                         const NERV_Chassis_VelocityTypeDef *measured, float dt_s);
 #endif
 
+static NERV_StatusTypeDef NERV_Chassis_SetWheelCurrent(NERV_Motor_InstanceTypeDef *motor,
+                                                       float current_a);
+
 _Static_assert((int)NERV_CHASSIS_TYPE_MECANUM == (int)NERV_CHASSIS_TYPE_MECANUM_RT,
                "NERV_CHASSIS_TYPE_MECANUM and NERV_CHASSIS_TYPE_MECANUM_RT must be equal.");
 _Static_assert((int)NERV_CHASSIS_TYPE_OMNI == (int)NERV_CHASSIS_TYPE_OMNI_RT,
                "NERV_CHASSIS_TYPE_OMNI and NERV_CHASSIS_TYPE_OMNI_RT must be equal.");
+
+/**
+  * @brief  按标量电流设置单轮控制目标.
+  * @param  motor 电机实例, 不得为 NULL.
+  * @param  current_a 目标电流, 单位 A.
+  * @retval NERV_OK 目标已保存.
+  * @retval NERV_ERROR 参数非法, 实例未初始化, 或型号不支持 SCALAR 控制.
+  * @note   底盘统一按标量电流控制, 编码换算由电机驱动的 encode_tx 完成.
+  */
+static NERV_StatusTypeDef NERV_Chassis_SetWheelCurrent(NERV_Motor_InstanceTypeDef *motor,
+                                                       float current_a)
+{
+    NERV_Motor_ControlTypeDef control;
+
+    control.kind     = NERV_MOTOR_CONTROL_SCALAR;
+    control.u.scalar = current_a;
+
+    return NERV_Motor_SetControl(motor, &control);
+}
 
 /**
   * @brief  校验电机实例可用于底盘的标量电流控制.
@@ -105,7 +127,7 @@ static NERV_StatusTypeDef NERV_Chassis_ValidateMotor(const NERV_Motor_InstanceTy
 
     if ((NERV_MOTOR_CONTROL_SCALAR != model->control_mode) ||
         !(model->control.scalar.full_scale > __NERV_CHASSIS_MIN_SCALE) ||
-        (model->control.scalar.cmd_limit <= 0))
+        (model->control.scalar.cmd_limit_raw <= 0))
     {
         return NERV_ERROR;
     }
@@ -619,7 +641,7 @@ NERV_StatusTypeDef NERV_Chassis_SetVelocity(NERV_Chassis_InstanceTypeDef *self,
   * @param  now_ms 当前时刻, 单位 ms. 由调用方提供, 库不读取硬件时钟.
   * @retval NERV_OK 本周期控制链已完成.
   * @retval NERV_ERROR 实例为 NULL 或未初始化, 或正解, 速度环, 逆解, 轮速环任一失败.
-  * @note   轮速环输出电流, 经 NERV_Motor_SetTarget 下发; 指令发送由
+  * @note   轮速环输出电流, 经 NERV_Chassis_SetWheelCurrent 下发; 指令发送由
   *         NERV_Motor_UpdateGroup 完成.
   * @note   NOT ISR-safe.
   * @note   caller-synchronized.
@@ -688,8 +710,8 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     {
         for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
         {
-            if (NERV_OK !=
-                NERV_Motor_SetTarget(self->config.drive_motors[index], drive_current_a[index]))
+            if (NERV_OK != NERV_Chassis_SetWheelCurrent(self->config.drive_motors[index],
+                                                        drive_current_a[index]))
             {
                 self->error |= NERV_ERR_CHASSIS_WHEEL_OFFLINE;
                 ok = false;
@@ -845,7 +867,7 @@ NERV_StatusTypeDef NERV_Chassis_EnterSafeState(NERV_Chassis_InstanceTypeDef *sel
     for (uint8_t index = 0U; index < NERV_CHASSIS_WHEEL_COUNT; index++)
     {
         (void)NERV_PID_Reset(&self->wheel_speed_pid[index]);
-        (void)NERV_Motor_SetTarget(self->config.drive_motors[index], 0.0f);
+        (void)NERV_Chassis_SetWheelCurrent(self->config.drive_motors[index], 0.0f);
     }
 
     return NERV_OK;

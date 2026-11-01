@@ -8,7 +8,6 @@ add_library(nerv STATIC
     public/Src/nerv_pid.c
     public/Src/nerv_utils.c
     module/motor/Src/nerv_motor.c
-    module/motor/driver/nerv_motor_driver.c
     module/motor/driver/DM/nerv_motor_driver_dm.c
     module/motor/driver/DJI/nerv_motor_driver_dji.c
     module/chassis/Src/nerv_chassis.c

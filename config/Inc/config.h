@@ -231,26 +231,20 @@
 /* 云台轴数. 同一次编译只能选择一种. */
 
 /**
-  * @brief 两轴云台.
+  * @brief 四轴云台, 大 yaw, 小 yaw, pitch, roll 依次串联.
   */
-#define NERV_GIMBAL_AXIS_COUNT_2 2U
-
-/**
-  * @brief 三轴云台.
-  */
-#define NERV_GIMBAL_AXIS_COUNT_3 3U
+#define NERV_GIMBAL_AXIS_COUNT_4 4U
 
 #ifndef NERV_GIMBAL_AXIS_COUNT
 /**
   * @brief 当前选择的云台轴数.
-  * @note  必须取 NERV_GIMBAL_AXIS_COUNT_2 或 NERV_GIMBAL_AXIS_COUNT_3.
+  * @note  必须取 NERV_GIMBAL_AXIS_COUNT_4.
   */
-#define NERV_GIMBAL_AXIS_COUNT NERV_GIMBAL_AXIS_COUNT_2
+#define NERV_GIMBAL_AXIS_COUNT NERV_GIMBAL_AXIS_COUNT_4
 #endif
 
-#if (NERV_GIMBAL_AXIS_COUNT != NERV_GIMBAL_AXIS_COUNT_2) && \
-    (NERV_GIMBAL_AXIS_COUNT != NERV_GIMBAL_AXIS_COUNT_3)
-#error "NERV_GIMBAL_AXIS_COUNT must be 2 or 3."
+#if (NERV_GIMBAL_AXIS_COUNT != NERV_GIMBAL_AXIS_COUNT_4)
+#error "NERV_GIMBAL_AXIS_COUNT must be NERV_GIMBAL_AXIS_COUNT_4."
 #endif
 
 #endif /* NERV_USE_GIMBAL */

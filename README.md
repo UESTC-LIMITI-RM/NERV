@@ -6,7 +6,7 @@ NERV 负责电机控制, 底盘运动学, PID 调节与总线收发, 把硬件�
 
 ## 特性
 
-- 统一电机接口, 所有类型的电机共用同一套 Init, SetControl, Update, OnRx 调用方式
+- 统一电机接口, 所有类型的电机共用同一套 Init, SetControl, UpdateGroup, OnRx 调用方式
 - 达妙 DM-J4310-2EC 支持 MIT, 位置速度, 速度三种控制模式
 - DJI M3508, M2006, GM6020 电流与电压模式
 - 底盘运动学支持全向轮与麦克纳姆轮两种构型
@@ -113,7 +113,7 @@ static const NERV_Motor_ConfigTypeDef dm_config = {
     .gear_ratio  = 1.0f,
     .offline_ms  = 100U,
     .over_temperature_c = 100.0f,
-    .control_limit = 0U,
+    .control_limit = 0.0f,
     .invert_direction = false,
 };
 

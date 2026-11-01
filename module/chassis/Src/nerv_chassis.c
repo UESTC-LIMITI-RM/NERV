@@ -148,7 +148,6 @@ static void NERV_Chassis_ResetState(NERV_Chassis_InstanceTypeDef *self)
     self->planned_velocity.vy_mps   = 0.0f;
     self->planned_velocity.wz_radps = 0.0f;
     self->error                     = NERV_ERR_NONE;
-    self->last_reported_error       = 0U;
     self->last_update_ms            = 0U;
 
     (void)NERV_PID_Reset(&self->translate_pid[0]);
@@ -455,12 +454,6 @@ static void NERV_Chassis_UpdateHealth(NERV_Chassis_InstanceTypeDef *self)
             self->error |= NERV_ERR_MOTOR_OVER_TEMP;
         }
     }
-
-    if ((NULL != self->fault_callback) && (self->error != self->last_reported_error))
-    {
-        self->last_reported_error = self->error;
-        self->fault_callback(self->fault_user, self->error);
-    }
 }
 
 #if (NERV_USE_CHASSIS_ODOMETRY == NERV_ENABLE)
@@ -654,6 +647,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     float drive_current_a[NERV_CHASSIS_WHEEL_COUNT];
     float dt_s;
     bool ok;
+    uint32_t error_before;
 
     if (NULL == self)
     {
@@ -664,6 +658,8 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     {
         return NERV_ERROR;
     }
+
+    error_before = self->error;
 
     dt_s = (float)(now_ms - self->last_update_ms) / 1000.0f;
 
@@ -737,6 +733,12 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
     self->last_update_ms = now_ms;
 
     NERV_Chassis_UpdateHealth(self);
+
+    /* 只在本次新增错误位时通知, 同一组错误持续存在不会重复回调. */
+    if ((NULL != self->fault_callback) && (0U != (self->error & ~error_before)))
+    {
+        self->fault_callback(self->fault_user, self->error);
+    }
 
     return ok ? NERV_OK : NERV_ERROR;
 }

@@ -141,10 +141,9 @@ typedef struct NERV_Chassis_Instance
 
 #endif /* NERV_USE_CHASSIS_ODOMETRY */
 
-    uint32_t error;               /**< 粘滞错误位, 经 NERV_Chassis_ReadError 读取 */
-    uint32_t last_reported_error; /**< 上次已通知的错误位掩码 */
-    uint32_t last_update_ms;      /**< 上次 Update 的时刻, 单位 ms, 供里程计积分求间隔 */
-    bool initialized;             /**< 初始化完成标志, 由 NERV_Chassis_Init 置位 */
+    uint32_t error;          /**< 粘滞错误位, 经 NERV_Chassis_ReadError 读取 */
+    uint32_t last_update_ms; /**< 上次 Update 的时刻, 单位 ms, 供里程计积分求间隔 */
+    bool initialized;        /**< 初始化完成标志, 由 NERV_Chassis_Init 置位 */
     NERV_Chassis_FaultCallbackTypeDef fault_callback; /**< 故障回调, NULL 表示未注册 */
     void *fault_user;                                 /**< 故障回调上下文, 可以为 NULL */
 } NERV_Chassis_InstanceTypeDef;

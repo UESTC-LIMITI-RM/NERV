@@ -60,7 +60,7 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .fb_bit_packed               = true,
     .angle_count                 = 65535U,
     .fb_control_full_scale       = 30.0f,
-    .fb_control_cmd_limit        = 4095,
+    .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_MIT,
@@ -90,7 +90,7 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .fb_bit_packed               = true,
     .angle_count                 = 65535U,
     .fb_control_full_scale       = 30.0f,
-    .fb_control_cmd_limit        = 4095,
+    .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_SCALAR,
@@ -121,7 +121,7 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .fb_bit_packed               = true,
     .angle_count                 = 65535U,
     .fb_control_full_scale       = 30.0f,
-    .fb_control_cmd_limit        = 4095,
+    .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .rx_id_offset_by_device      = false,
     .control_mode                = NERV_MOTOR_CONTROL_POSITION_VELOCITY,
@@ -406,54 +406,31 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SaveZero(const NERV_FDCAN_InstanceTypeDe
     return NERV_Motor_Dm_SendSpecial(bus, model, device_id, __NERV_DM_CMD_SAVE_ZERO);
 }
 
-/** @brief 按能力位选择实现函数, 未声明时落回不支持实现. */
-#define __NERV_OPS_PICK(_caps, _bit, _impl, _fallback) (((_caps) & (_bit)) ? (_impl) : (_fallback))
-
-/** @brief 达妙驱动支持的全部可选能力. */
-#define __NERV_DM_CAPS                                                             \
-    (NERV_MOTOR_CAP_ENABLE | NERV_MOTOR_CAP_DISABLE | NERV_MOTOR_CAP_CLEAR_FAULT | \
-     NERV_MOTOR_CAP_SET_MODE | NERV_MOTOR_CAP_SAVE_ZERO)
-
-/** @brief 按能力位生成操作表, 未声明的能力自动落回不支持实现. */
-#define __NERV_DM_OPS(_caps)                                                                        \
-    {                                                                                               \
-        .get_frame_geo = NERV_Motor_Dm_GetFrameGeo,                                                 \
-        .encode_tx     = NERV_Motor_Dm_EncodeTx,                                                    \
-        .decode_fb     = NERV_Motor_Dm_DecodeFb,                                                    \
-        .enable        = __NERV_OPS_PICK(_caps, NERV_MOTOR_CAP_ENABLE, NERV_Motor_Dm_Enable,        \
-                                         NERV_Motor_Driver_NotSupported),                           \
-        .disable       = __NERV_OPS_PICK(_caps, NERV_MOTOR_CAP_DISABLE, NERV_Motor_Dm_Disable,      \
-                                         NERV_Motor_Driver_NotSupported),                           \
-        .clear_fault   = __NERV_OPS_PICK(_caps, NERV_MOTOR_CAP_CLEAR_FAULT,                         \
-                                         NERV_Motor_Dm_ClearFault, NERV_Motor_Driver_NotSupported), \
-        .set_mode      = __NERV_OPS_PICK(_caps, NERV_MOTOR_CAP_SET_MODE, NERV_Motor_Dm_SetMode,     \
-                                         NERV_Motor_Driver_NotSupportedSetMode),                    \
-        .save_zero     = __NERV_OPS_PICK(_caps, NERV_MOTOR_CAP_SAVE_ZERO, NERV_Motor_Dm_SaveZero,   \
-                                         NERV_Motor_Driver_NotSupported),                           \
-    }
-
-/** @brief 达妙 CAN 电机协议族操作表. */
-static const NERV_Motor_Driver_OpsTypeDef dm_ops = __NERV_DM_OPS(__NERV_DM_CAPS);
+/** @brief 达妙 CAN 电机协议族操作表, 三个型号都支持全部可选能力. */
+static const NERV_Motor_Driver_OpsTypeDef dm_ops = {
+    .get_frame_geo = NERV_Motor_Dm_GetFrameGeo,
+    .encode_tx     = NERV_Motor_Dm_EncodeTx,
+    .decode_fb     = NERV_Motor_Dm_DecodeFb,
+    .enable        = NERV_Motor_Dm_Enable,
+    .disable       = NERV_Motor_Dm_Disable,
+    .clear_fault   = NERV_Motor_Dm_ClearFault,
+    .set_mode      = NERV_Motor_Dm_SetMode,
+    .save_zero     = NERV_Motor_Dm_SaveZero,
+};
 
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmMit = {
-    .capabilities = NERV_MOTOR_CAP_ENABLE | NERV_MOTOR_CAP_DISABLE | NERV_MOTOR_CAP_CLEAR_FAULT |
-                    NERV_MOTOR_CAP_SET_MODE | NERV_MOTOR_CAP_SAVE_ZERO,
-    .ops          = &dm_ops,
-    .model        = &dm_model_mit,
+    .ops   = &dm_ops,
+    .model = &dm_model_mit,
 };
 
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmVelocity = {
-    .capabilities = NERV_MOTOR_CAP_ENABLE | NERV_MOTOR_CAP_DISABLE | NERV_MOTOR_CAP_CLEAR_FAULT |
-                    NERV_MOTOR_CAP_SET_MODE | NERV_MOTOR_CAP_SAVE_ZERO,
-    .ops          = &dm_ops,
-    .model        = &dm_model_velocity,
+    .ops   = &dm_ops,
+    .model = &dm_model_velocity,
 };
 
 const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity = {
-    .capabilities = NERV_MOTOR_CAP_ENABLE | NERV_MOTOR_CAP_DISABLE | NERV_MOTOR_CAP_CLEAR_FAULT |
-                    NERV_MOTOR_CAP_SET_MODE | NERV_MOTOR_CAP_SAVE_ZERO,
-    .ops          = &dm_ops,
-    .model        = &dm_model_position_velocity,
+    .ops   = &dm_ops,
+    .model = &dm_model_position_velocity,
 };
 
 /**

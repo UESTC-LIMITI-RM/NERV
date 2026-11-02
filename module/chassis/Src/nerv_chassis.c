@@ -22,27 +22,27 @@
 /** @brief 控制周期的上限, 单位 s.
   * @note  两次调用间隔超过本值时按本值计算. 长时间停更后, 斜坡, PID 积分与里程计
   *        会一次性推进一大步, 产生可见跳变. */
-#define __NERV_CHASSIS_MAX_DT_S 0.1f
+#define NERV_INNER_CHASSIS_MAX_DT_S 0.1f
 
 /** @brief 控制周期的下限, 单位 s.
   * @note  now_ms 未推进时差值为 0, PID 的微分项会退化为 0/0, 里程计也不前进.
   *        把间隔钳到本值, 保证每个周期都有可用的正间隔. */
-#define __NERV_CHASSIS_MIN_DT_S 0.001f
+#define NERV_INNER_CHASSIS_MIN_DT_S 0.001f
 
 /** @brief 麦克纳姆轮正解的方向系数和, 取 2.
   * @note  四轮布局下 vx 与 vy 的正解分母为 2 * DIRECTION_SUM, 即 4;
   *        wz 的分母再乘等效力臂 (center_offset_x_m + center_offset_y_m). */
-#define __NERV_CHASSIS_DIRECTION_SUM 2.0f
+#define NERV_INNER_CHASSIS_DIRECTION_SUM 2.0f
 
 /** @brief 全向轮正解系数, 等于 1/(2 * sqrt(2)), 约 0.35355339.
   * @note  各轮驱动方向为周向切向, 分量是 1/sqrt(2). 四轮求和后乘以本系数得到车体
   *        平移速度. 与轮径和布局尺寸无关, 只由驱动方向决定. */
-#define __NERV_CHASSIS_OMNI_FORCE_FACTOR 0.35355339f
+#define NERV_INNER_CHASSIS_OMNI_FORCE_FACTOR 0.35355339f
 
 /** @brief 电机量程有效性下限.
   * @note  control 是 union, 型号描述符填错字段时, 原字段的位模式可能被解释成一个
   *        极小的正浮点数. 仅判断大于 0 会让这种脏数据通过校验, 因此用本值过滤. */
-#define __NERV_CHASSIS_MIN_SCALE 1.0e-3f
+#define NERV_INNER_CHASSIS_MIN_SCALE 1.0e-3f
 
 #if (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI)
 
@@ -126,7 +126,7 @@ static NERV_StatusTypeDef NERV_Chassis_ValidateMotor(const NERV_Motor_InstanceTy
     model = driver->model;
 
     if ((NERV_MOTOR_CONTROL_SCALAR != model->control_mode) ||
-        !(model->control.scalar.full_scale > __NERV_CHASSIS_MIN_SCALE) ||
+        !(model->control.scalar.full_scale > NERV_INNER_CHASSIS_MIN_SCALE) ||
         (model->control.scalar.cmd_limit_raw <= 0))
     {
         return NERV_ERROR;
@@ -257,14 +257,14 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceT
 
         measured->vx_mps   = (-wheel_speed_radps[0] - wheel_speed_radps[1] + wheel_speed_radps[2] +
                               wheel_speed_radps[3]) *
-                             config->wheel_radius_m / (2.0f * __NERV_CHASSIS_DIRECTION_SUM);
+                             config->wheel_radius_m / (2.0f * NERV_INNER_CHASSIS_DIRECTION_SUM);
         measured->vy_mps   = (wheel_speed_radps[0] - wheel_speed_radps[1] - wheel_speed_radps[2] +
                               wheel_speed_radps[3]) *
-                             config->wheel_radius_m / (2.0f * __NERV_CHASSIS_DIRECTION_SUM);
+                             config->wheel_radius_m / (2.0f * NERV_INNER_CHASSIS_DIRECTION_SUM);
         measured->wz_radps = (wheel_speed_radps[0] + wheel_speed_radps[1] + wheel_speed_radps[2] +
                               wheel_speed_radps[3]) *
                              config->wheel_radius_m /
-                             (2.0f * __NERV_CHASSIS_DIRECTION_SUM * lever_sum_m);
+                             (2.0f * NERV_INNER_CHASSIS_DIRECTION_SUM * lever_sum_m);
     }
 
 #else
@@ -291,8 +291,8 @@ static NERV_StatusTypeDef NERV_Chassis_SolveForward(const NERV_Chassis_InstanceT
             sum_lever += speed_mps * center_distance_m;
         }
 
-        measured->vx_mps = sum_direction_x * __NERV_CHASSIS_OMNI_FORCE_FACTOR;
-        measured->vy_mps = sum_direction_y * __NERV_CHASSIS_OMNI_FORCE_FACTOR;
+        measured->vx_mps = sum_direction_x * NERV_INNER_CHASSIS_OMNI_FORCE_FACTOR;
+        measured->vy_mps = sum_direction_y * NERV_INNER_CHASSIS_OMNI_FORCE_FACTOR;
         measured->wz_radps =
             sum_lever / ((float)NERV_CHASSIS_WHEEL_COUNT * center_distance_m * center_distance_m);
     }
@@ -663,13 +663,13 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     dt_s = (float)(now_ms - self->last_update_ms) / 1000.0f;
 
-    if (dt_s > __NERV_CHASSIS_MAX_DT_S)
+    if (dt_s > NERV_INNER_CHASSIS_MAX_DT_S)
     {
-        dt_s = __NERV_CHASSIS_MAX_DT_S;
+        dt_s = NERV_INNER_CHASSIS_MAX_DT_S;
     }
     else if (dt_s <= 0.0f)
     {
-        dt_s = __NERV_CHASSIS_MIN_DT_S;
+        dt_s = NERV_INNER_CHASSIS_MIN_DT_S;
     }
 
     NERV_Chassis_RampVelocity(self, dt_s);

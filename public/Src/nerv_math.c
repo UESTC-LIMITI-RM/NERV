@@ -183,7 +183,7 @@ NERV_StatusTypeDef NERV_Math_RotateZ(float *vx, float *vy, float angle_rad)
 /** @cond INTERNAL */
 
 /** @brief 三阶线性方程组求解的相对奇异判据阈值. */
-#define __NERV_MATH_LINEAR3_SINGULAR_EPS 1e-6f
+#define NERV_INNER_MATH_LINEAR3_SINGULAR_EPS 1e-6f
 
 /**
   * @brief  计算三阶矩阵的行和绝对值的最大值, 作为矩阵量级.
@@ -256,7 +256,7 @@ NERV_StatusTypeDef NERV_Math_SolveLinear3(const float *matrix, const float *rhs,
     const float matrix_norm = NERV_Math_MatrixNorm3(matrix);
 
     if (fabsf(determinant) <=
-        (__NERV_MATH_LINEAR3_SINGULAR_EPS * matrix_norm * matrix_norm * matrix_norm))
+        (NERV_INNER_MATH_LINEAR3_SINGULAR_EPS * matrix_norm * matrix_norm * matrix_norm))
     {
         return NERV_ERROR;
     }

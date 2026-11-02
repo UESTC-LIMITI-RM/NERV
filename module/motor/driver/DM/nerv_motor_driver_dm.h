@@ -8,8 +8,8 @@
   * SPDX-License-Identifier: MIT
   */
 
-#ifndef __NERV_MOTOR_DRIVER_DM_H
-#define __NERV_MOTOR_DRIVER_DM_H
+#ifndef NERV_INNER_MOTOR_DRIVER_DM_H
+#define NERV_INNER_MOTOR_DRIVER_DM_H
 
 #include "nerv_motor_driver.h"
 
@@ -47,4 +47,4 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_DmPositionVelocity;
 }
 #endif
 
-#endif /* __NERV_MOTOR_DRIVER_DM_H */
+#endif /* NERV_INNER_MOTOR_DRIVER_DM_H */

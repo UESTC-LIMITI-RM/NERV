@@ -16,10 +16,10 @@
 
 /** @cond INTERNAL */
 
-#define __NERV_UTILS_SECONDS_PER_MINUTE 60.0f
-#define __NERV_UTILS_RADPS_PER_RPM      (NERV_MATH_TWO_PI / __NERV_UTILS_SECONDS_PER_MINUTE)
-#define __NERV_UTILS_RPM_PER_RADPS      (__NERV_UTILS_SECONDS_PER_MINUTE / NERV_MATH_TWO_PI)
-#define __NERV_UTILS_MAX_RADPS          (FLT_MAX / __NERV_UTILS_RPM_PER_RADPS)
+#define NERV_INNER_UTILS_SECONDS_PER_MINUTE 60.0f
+#define NERV_INNER_UTILS_RADPS_PER_RPM      (NERV_MATH_TWO_PI / NERV_INNER_UTILS_SECONDS_PER_MINUTE)
+#define NERV_INNER_UTILS_RPM_PER_RADPS      (NERV_INNER_UTILS_SECONDS_PER_MINUTE / NERV_MATH_TWO_PI)
+#define NERV_INNER_UTILS_MAX_RADPS          (FLT_MAX / NERV_INNER_UTILS_RPM_PER_RADPS)
 
 /** @endcond */
 
@@ -39,7 +39,7 @@ float NERV_Utils_RpmToRadps(float rpm)
         return rpm;
     }
 
-    return rpm * __NERV_UTILS_RADPS_PER_RPM;
+    return rpm * NERV_INNER_UTILS_RADPS_PER_RPM;
 }
 
 /**
@@ -58,10 +58,10 @@ float NERV_Utils_RadpsToRpm(float radps)
         return radps;
     }
 
-    if (fabsf(radps) >= __NERV_UTILS_MAX_RADPS)
+    if (fabsf(radps) >= NERV_INNER_UTILS_MAX_RADPS)
     {
         return copysignf(FLT_MAX, radps);
     }
 
-    return radps * __NERV_UTILS_RPM_PER_RADPS;
+    return radps * NERV_INNER_UTILS_RPM_PER_RADPS;
 }

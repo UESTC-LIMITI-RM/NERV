@@ -21,15 +21,15 @@
 #if (NERV_USE_MOTOR == NERV_ENABLE) && (NERV_USE_MOTOR_DM == NERV_ENABLE)
 
 /** @brief 达妙特殊命令码, 占用 8 字节帧的最后一字节, 前 7 字节为 0xFF. */
-#define __NERV_DM_CMD_CLEAR_ERROR 0xFBU
-#define __NERV_DM_CMD_ENABLE      0xFCU
-#define __NERV_DM_CMD_DISABLE     0xFDU
-#define __NERV_DM_CMD_SAVE_ZERO   0xFEU
+#define NERV_INNER_DM_CMD_CLEAR_ERROR 0xFBU
+#define NERV_INNER_DM_CMD_ENABLE      0xFCU
+#define NERV_INNER_DM_CMD_DISABLE     0xFDU
+#define NERV_INNER_DM_CMD_SAVE_ZERO   0xFEU
 
 /** @brief 0x7FF 模式切换帧 D[4] 取值. */
-#define __NERV_DM_MODE_MIT               1U
-#define __NERV_DM_MODE_POSITION_VELOCITY 2U
-#define __NERV_DM_MODE_VELOCITY          3U
+#define NERV_INNER_DM_MODE_MIT               1U
+#define NERV_INNER_DM_MODE_POSITION_VELOCITY 2U
+#define NERV_INNER_DM_MODE_VELOCITY          3U
 
 static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTypeDef *bus,
                                                     const NERV_Motor_ModelTypeDef *model,
@@ -40,9 +40,9 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SetMode(const NERV_FDCAN_InstanceTypeDef
                                                 uint8_t device_id,
                                                 NERV_Motor_ControlKindTypeDef mode);
 
-#define __NERV_DM_FRAME_LEN 8U
-#define __NERV_DM_POS_MAX   65535.0f
-#define __NERV_DM_AUX_MAX   4095.0f
+#define NERV_INNER_DM_FRAME_LEN 8U
+#define NERV_INNER_DM_POS_MAX   65535.0f
+#define NERV_INNER_DM_AUX_MAX   4095.0f
 
 /** @brief DM-J4310-2EC MIT 模式型号描述符. */
 static const NERV_Motor_ModelTypeDef dm_model_mit = {
@@ -52,7 +52,7 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .id_min                      = 1U,
     .id_max                      = 0x7FU,
     .motors_per_frame            = 1U,
-    .frame_len                   = __NERV_DM_FRAME_LEN,
+    .frame_len                   = NERV_INNER_DM_FRAME_LEN,
     .fb_angle_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_speed_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_current_off              = NERV_MOTOR_FB_OFF_NONE,
@@ -81,7 +81,7 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .id_min                      = 1U,
     .id_max                      = 0x7FU,
     .motors_per_frame            = 1U,
-    .frame_len                   = __NERV_DM_FRAME_LEN,
+    .frame_len                   = NERV_INNER_DM_FRAME_LEN,
     .fb_angle_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_speed_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_current_off              = NERV_MOTOR_FB_OFF_NONE,
@@ -111,7 +111,7 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .id_min                      = 1U,
     .id_max                      = 0x7FU,
     .motors_per_frame            = 1U,
-    .frame_len                   = __NERV_DM_FRAME_LEN,
+    .frame_len                   = NERV_INNER_DM_FRAME_LEN,
     .fb_angle_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_speed_off                = NERV_MOTOR_FB_OFF_NONE,
     .fb_current_off              = NERV_MOTOR_FB_OFF_NONE,
@@ -380,28 +380,28 @@ static NERV_StatusTypeDef NERV_Motor_Dm_Enable(const NERV_FDCAN_InstanceTypeDef 
                                                const NERV_Motor_ModelTypeDef *model,
                                                uint8_t device_id)
 {
-    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, __NERV_DM_CMD_ENABLE);
+    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, NERV_INNER_DM_CMD_ENABLE);
 }
 
 static NERV_StatusTypeDef NERV_Motor_Dm_Disable(const NERV_FDCAN_InstanceTypeDef *bus,
                                                 const NERV_Motor_ModelTypeDef *model,
                                                 uint8_t device_id)
 {
-    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, __NERV_DM_CMD_DISABLE);
+    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, NERV_INNER_DM_CMD_DISABLE);
 }
 
 static NERV_StatusTypeDef NERV_Motor_Dm_ClearFault(const NERV_FDCAN_InstanceTypeDef *bus,
                                                    const NERV_Motor_ModelTypeDef *model,
                                                    uint8_t device_id)
 {
-    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, __NERV_DM_CMD_CLEAR_ERROR);
+    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, NERV_INNER_DM_CMD_CLEAR_ERROR);
 }
 
 static NERV_StatusTypeDef NERV_Motor_Dm_SaveZero(const NERV_FDCAN_InstanceTypeDef *bus,
                                                  const NERV_Motor_ModelTypeDef *model,
                                                  uint8_t device_id)
 {
-    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, __NERV_DM_CMD_SAVE_ZERO);
+    return NERV_Motor_Dm_SendSpecial(bus, model, device_id, NERV_INNER_DM_CMD_SAVE_ZERO);
 }
 
 /** @brief 达妙 CAN 电机协议族操作表, 三个型号都支持全部可选能力. */
@@ -460,14 +460,14 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
         return NERV_ERROR;
     }
 
-    for (uint8_t index = 0U; index < __NERV_DM_FRAME_LEN; index++)
+    for (uint8_t index = 0U; index < NERV_INNER_DM_FRAME_LEN; index++)
     {
         frame.data[index] = 0xFFU;
     }
 
-    frame.data[__NERV_DM_FRAME_LEN - 1U] = command;
+    frame.data[NERV_INNER_DM_FRAME_LEN - 1U] = command;
     frame.id                             = geo.tx_id;
-    frame.len                            = __NERV_DM_FRAME_LEN;
+    frame.len                            = NERV_INNER_DM_FRAME_LEN;
     frame.flags                          = 0U;
 
     return NERV_FDCAN_Transmit(bus, &frame);
@@ -504,13 +504,13 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SetMode(const NERV_FDCAN_InstanceTypeDef
     switch (mode)
     {
     case NERV_MOTOR_CONTROL_MIT:
-        register_value = __NERV_DM_MODE_MIT;
+        register_value = NERV_INNER_DM_MODE_MIT;
         break;
     case NERV_MOTOR_CONTROL_POSITION_VELOCITY:
-        register_value = __NERV_DM_MODE_POSITION_VELOCITY;
+        register_value = NERV_INNER_DM_MODE_POSITION_VELOCITY;
         break;
     case NERV_MOTOR_CONTROL_SCALAR:
-        register_value = __NERV_DM_MODE_VELOCITY;
+        register_value = NERV_INNER_DM_MODE_VELOCITY;
         break;
     default:
         return NERV_ERROR;

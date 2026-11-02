@@ -26,14 +26,14 @@
 
 /* ========================================================================== */
 /* 以下定义为 DJI 协议族驱动内部实现常数, 禁止修改.                           */
-/* 作用域: 所有 __NERV_MOTOR_DJI_ 开头的宏, 直至本定义区结束.                  */
+/* 作用域: 所有 NERV_INNER_MOTOR_DJI_ 开头的宏, 直至本定义区结束.                  */
 /* ========================================================================== */
 
 /** @brief 单条控制帧中每个电机指令占用的字节数. */
-#define __NERV_MOTOR_DJI_MOTOR_BYTES 2U
+#define NERV_INNER_MOTOR_DJI_MOTOR_BYTES 2U
 
 /** @brief 单字节的位数, 用于显式大端编解码. */
-#define __NERV_MOTOR_DJI_BYTE_BITS 8U
+#define NERV_INNER_MOTOR_DJI_BYTE_BITS 8U
 
 /* ========================================================================== */
 /* DJI 协议族驱动内部常数定义区结束                                           */
@@ -181,7 +181,7 @@ static const NERV_Motor_ModelTypeDef dji_model_6020_voltage = {
   */
 static uint16_t NERV_Motor_Dji_ReadBE16(const uint8_t *data, uint8_t offset)
 {
-    return (uint16_t)(((uint16_t)data[offset] << __NERV_MOTOR_DJI_BYTE_BITS) |
+    return (uint16_t)(((uint16_t)data[offset] << NERV_INNER_MOTOR_DJI_BYTE_BITS) |
                       (uint16_t)data[offset + 1U]);
 }
 
@@ -195,7 +195,7 @@ static uint16_t NERV_Motor_Dji_ReadBE16(const uint8_t *data, uint8_t offset)
   */
 static void NERV_Motor_Dji_WriteBE16(uint8_t *data, uint8_t offset, uint16_t value)
 {
-    data[offset]      = (uint8_t)(value >> __NERV_MOTOR_DJI_BYTE_BITS);
+    data[offset]      = (uint8_t)(value >> NERV_INNER_MOTOR_DJI_BYTE_BITS);
     data[offset + 1U] = (uint8_t)(value & 0xFFU);
 }
 
@@ -273,7 +273,7 @@ static NERV_StatusTypeDef NERV_Motor_Dji_EncodeTx(const NERV_Motor_ModelTypeDef 
     const int32_t raw = (int32_t)control_clamped;
     const uint8_t offset =
         (uint8_t)(((uint32_t)(device_id - model->id_min) % (uint32_t)model->motors_per_frame) *
-                  (uint32_t)__NERV_MOTOR_DJI_MOTOR_BYTES);
+                  (uint32_t)NERV_INNER_MOTOR_DJI_MOTOR_BYTES);
 
     NERV_Motor_Dji_WriteBE16(frame, offset, (uint16_t)(int16_t)raw);
 

@@ -21,10 +21,9 @@
 
 #if (NERV_USE_MOTOR == NERV_ENABLE)
 
-#define __NERV_MOTOR_DIRECTION_SIGN_INVERTED (-1.0f)
-#define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
-#define __NERV_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
-#define __NERV_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
+#define NERV_INNER_MOTOR_DIRECTION_SIGN_INVERTED (-1.0f)
+#define NERV_INNER_MOTOR_CONFIG_ACTIVE_F(_value) ((_value) > 0.0f)
+#define NERV_INNER_MOTOR_CONFIG_ACTIVE_U(_value) ((_value) > 0U)
 
 static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef *model);
 static void NERV_Motor_ResetState(NERV_Motor_InstanceTypeDef *self);
@@ -831,7 +830,7 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
   */
 static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self)
 {
-    return self->config.invert_direction ? __NERV_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
+    return self->config.invert_direction ? NERV_INNER_MOTOR_DIRECTION_SIGN_INVERTED : 1.0f;
 }
 
 /**
@@ -896,7 +895,7 @@ static NERV_Motor_ControlTypeDef NERV_Motor_ActiveControl(const NERV_Motor_Insta
     case NERV_MOTOR_CONTROL_SCALAR:
         control.u.scalar *= sign;
 
-        if (__NERV_MOTOR_CONFIG_ACTIVE_F(self->config.control_limit))
+        if (NERV_INNER_MOTOR_CONFIG_ACTIVE_F(self->config.control_limit))
         {
             control.u.scalar = NERV_Math_Clamp(control.u.scalar, -self->config.control_limit,
                                                self->config.control_limit);
@@ -969,13 +968,13 @@ static void NERV_Motor_UpdateHealth(NERV_Motor_InstanceTypeDef *self, uint32_t n
         self->last_rx_ms    = now_ms;
         self->offline_armed = true;
     }
-    else if (__NERV_MOTOR_CONFIG_ACTIVE_U(self->config.offline_ms) &&
+    else if (NERV_INNER_MOTOR_CONFIG_ACTIVE_U(self->config.offline_ms) &&
              ((now_ms - self->last_rx_ms) >= NERV_UTILS_TIMEOUT_MS(self->config.offline_ms)))
     {
         self->error |= (NERV_ERR_MOTOR_OFFLINE & NERV_ERR_BITS_MASK);
     }
 
-    if (__NERV_MOTOR_CONFIG_ACTIVE_F(self->config.over_temperature_c) &&
+    if (NERV_INNER_MOTOR_CONFIG_ACTIVE_F(self->config.over_temperature_c) &&
         ((float)self->measurement.temperature_c >= self->config.over_temperature_c))
     {
         self->error |= (NERV_ERR_MOTOR_OVER_TEMP & NERV_ERR_BITS_MASK);

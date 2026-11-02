@@ -8,8 +8,8 @@
   * SPDX-License-Identifier: MIT
   */
 
-#ifndef __NERV_MOTOR_DRIVER_DJI_H
-#define __NERV_MOTOR_DRIVER_DJI_H
+#ifndef NERV_INNER_MOTOR_DRIVER_DJI_H
+#define NERV_INNER_MOTOR_DRIVER_DJI_H
 
 #include "nerv_motor_driver.h"
 
@@ -59,4 +59,4 @@ extern const NERV_Motor_DriverTypeDef NERV_Motor_Driver_Dji6020Voltage;
 }
 #endif
 
-#endif /* __NERV_MOTOR_DRIVER_DJI_H */
+#endif /* NERV_INNER_MOTOR_DRIVER_DJI_H */

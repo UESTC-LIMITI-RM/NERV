@@ -44,7 +44,8 @@ typedef struct
                              多个实例必须填写互不相同的值, 否则同一帧会被多个实例解码.
                              电调不可配置反馈标识符的协议族忽略本字段, 由型号与 device_id
                              推导, 例如 DJI. 取值可以为 0, 与达妙电调的出厂默认一致 */
-    float gear_ratio;   /**< 减速比, 必须大于 0, 输出轴角速度等于转子角速度除以本值 */
+    float feedback_ratio; /**< 位置与速度换算系数, 必须大于 0. 输出轴角度等于反馈角度
+                              除以本值, 反馈侧目标等于输出轴目标乘以本值. */
     uint32_t
         offline_ms; /**< 离线判定阈值, 单位 ms, 取大于 0 的有限值启用, NERV_DISABLE 表示关闭离线判定 */
     float
@@ -56,9 +57,9 @@ typedef struct
 
 /**
   * @brief  电机测量值, 机构系.
-  * @note   角度与角速度已按减速比换算到输出轴, 角度, 角速度与电流按安装方向
+  * @note   角度与角速度已按 feedback_ratio 换算到输出轴, 角度, 角速度与电流按安装方向
   *         取反, 温度原值透传, 正方向为机构正方向.
-  * @note   角度不做归一化, 原样保留驱动解码出的量并只做减速比与方向换算. 达妙反馈
+  * @note   角度不做归一化, 原样保留驱动解码出的量并只做 feedback_ratio 与方向换算. 达妙反馈
   *         落在 ±P_MAX, DJI 编码器量本身落在 [0, 2π).
   * @note   temperature_c 为 INT8_MIN 表示该型号无温度字段, 见 NERV_MOTOR_FB_OFF_NONE.
   */
@@ -74,9 +75,9 @@ typedef struct NERV_Motor_Measurement
 /**
   * @brief  电机实例.
   * @note   由调用方以静态存储提供并清零, 生命周期覆盖全部调用.
-  * @note   fb 与 measurement 是流水线两级: fb 为驱动解码的原始反馈, 转子量, 由
-  *         OnRx 在中断上下文写入; measurement 为按减速比与安装方向换算后的机构系
-  *         测量值, 由 Update 在任务上下文整体刷新.
+  * @note   fb 与 measurement 是流水线两级: fb 为驱动解码的原始反馈, 轴侧由型号决定
+  *         (DJI 为转子, 达妙为输出轴), 由 OnRx 在中断上下文写入; measurement 为按
+  *         feedback_ratio 与安装方向换算后的输出轴测量值, 由 Update 在任务上下文整体刷新.
   * @note   fb 的单个字段为 32 位对齐读写, 不会撕裂, 字段之间可能来自相邻两帧,
   *         混合窗口为一个帧间隔. measurement 由 Update 整体写入, 同一任务上下文
   *         的读者读到完整快照.
@@ -86,7 +87,7 @@ typedef struct NERV_Motor_Instance
 {
     NERV_Motor_ConfigTypeDef config; /**< 配置, 由 NERV_Motor_Init 绑定, 之后只读 */
 
-    NERV_Motor_FbTypeDef fb;                   /**< 原始反馈, 转子量, 由 NERV_Motor_OnRx 写入 */
+    NERV_Motor_FbTypeDef fb; /**< 原始反馈, 轴侧由型号决定, 由 NERV_Motor_OnRx 写入 */
     NERV_Motor_MeasurementTypeDef measurement; /**< 机构系测量值, 由 NERV_Motor_UpdateGroup 刷新 */
     uint32_t error;                            /**< 粘滞错误位, 经 NERV_Motor_ReadError 读取 */
     NERV_Motor_FrameGeoTypeDef geo;            /**< 帧几何信息, 由 NERV_Motor_Init 填充 */

@@ -9,6 +9,7 @@ NERV 负责电机控制, 底盘运动学, PID 调节与总线收发, 把硬件�
 - 统一电机接口, 所有类型的电机共用同一套 Init, SetControl, UpdateGroup, OnRx 调用方式
 - 达妙 DM-J4310-2EC 支持 MIT, 位置速度, 速度三种控制模式
 - DJI M3508, M2006, GM6020 电流与电压模式
+- 云台四轴控制: 大 yaw 速度模式, 小 yaw/pitch 位置模式, roll 速度环寻位与堵转保持
 - 底盘运动学支持全向轮与麦克纳姆轮两种构型
 - 底盘使用串级速控, 集成里程计与安全监督
 - FDCAN 总线抽象, 模块层不接触寄存器
@@ -20,7 +21,7 @@ NERV 负责电机控制, 底盘运动学, PID 调节与总线收发, 把硬件�
 ```
 public/     通用工具, 数学, PID, 单位换算, 日志, 状态码
 bsp/        板级抽象, FDCAN, GPIO, PWM, 时间
-module/     业务模块, 电机与底盘
+module/     业务模块, 电机, 底盘与云台
 config/     编译期配置入口 config.h
 ```
 
@@ -41,6 +42,7 @@ config/     编译期配置入口 config.h
 ```c
 #define NERV_USE_MOTOR   NERV_ENABLE
 #define NERV_USE_CHASSIS NERV_ENABLE
+#define NERV_USE_GIMBAL  NERV_ENABLE
 #define NERV_USE_MOTOR_DM  NERV_ENABLE
 #define NERV_USE_MOTOR_DJI NERV_ENABLE
 ```
@@ -58,6 +60,7 @@ module/motor/driver/*.c
 module/motor/driver/DM/*.c
 module/motor/driver/DJI/*.c
 module/chassis/Src/*.c
+module/gimbal/Src/*.c
 config/Src/config_check.c
 ```
 
@@ -72,6 +75,7 @@ module/motor/driver
 module/motor/driver/DM
 module/motor/driver/DJI
 module/chassis/Inc
+module/gimbal/Inc
 ```
 
 以 Keil 为例, 把上述路径填入 Include Path, 把源文件加入对应分组即可.仓库不提供 CMake 或 Makefile.
@@ -110,7 +114,7 @@ static const NERV_Motor_ConfigTypeDef dm_config = {
     .driver      = &NERV_Motor_Driver_DmVelocity,
     .bus         = &can2,
     .device_id   = 1U,
-    .gear_ratio  = 1.0f,
+    .feedback_ratio  = 1.0f,
     .offline_ms  = 100U,
     .over_temperature_c = 100.0f,
     .control_limit = 0.0f,

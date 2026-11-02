@@ -63,8 +63,7 @@ static const NERV_Motor_ModelTypeDef dm_model_mit = {
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .control_mode                = NERV_MOTOR_CONTROL_MIT,
-    .torque_constant_n_m_per_a   = 0.12f,
-    .rated_gear_ratio            = 10.0f,
+    .torque_constant_n_m_per_a   = 1.2f,
     .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
@@ -92,8 +91,7 @@ static const NERV_Motor_ModelTypeDef dm_model_velocity = {
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .control_mode                = NERV_MOTOR_CONTROL_SCALAR,
-    .torque_constant_n_m_per_a   = 0.12f,
-    .rated_gear_ratio            = 10.0f,
+    .torque_constant_n_m_per_a   = 1.2f,
     .fb_torque_present           = true,
     .scalar_quantity             = NERV_MOTOR_SCALAR_SPEED,
     .control.profile.p_max_rad   = 12.5f,
@@ -122,8 +120,7 @@ static const NERV_Motor_ModelTypeDef dm_model_position_velocity = {
     .fb_control_cmd_limit_raw    = 4095,
     .tx_id_offset_by_device      = true,
     .control_mode                = NERV_MOTOR_CONTROL_POSITION_VELOCITY,
-    .torque_constant_n_m_per_a   = 0.12f,
-    .rated_gear_ratio            = 10.0f,
+    .torque_constant_n_m_per_a   = 1.2f,
     .fb_torque_present           = true,
     .control.profile.p_max_rad   = 12.5f,
     .control.profile.v_max_radps = 30.0f,
@@ -466,9 +463,9 @@ static NERV_StatusTypeDef NERV_Motor_Dm_SendSpecial(const NERV_FDCAN_InstanceTyp
     }
 
     frame.data[NERV_INNER_DM_FRAME_LEN - 1U] = command;
-    frame.id                             = geo.tx_id;
-    frame.len                            = NERV_INNER_DM_FRAME_LEN;
-    frame.flags                          = 0U;
+    frame.id                                 = geo.tx_id;
+    frame.len                                = NERV_INNER_DM_FRAME_LEN;
+    frame.flags                              = 0U;
 
     return NERV_FDCAN_Transmit(bus, &frame);
 }

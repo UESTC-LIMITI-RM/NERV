@@ -27,17 +27,17 @@ extern "C" {
 
 /**
   * @brief  电机反馈.
-  * @note   只承载电机转子量的物理值. 反馈帧原始编码不进入本结构, 输出轴量按
-  *         减速比由模块内部另行换算.
+  * @note   承载反馈侧物理值, 轴侧由型号决定 (DJI 为转子, 达妙为输出轴). 反馈帧原始
+  *         编码不进入本结构, 输出轴量按 feedback_ratio 由模块内部另行换算.
   * @note   temperature_c 在型号无温度字段时为 INT8_MIN, 见 NERV_MOTOR_FB_OFF_NONE.
   */
 typedef struct NERV_Motor_Fb
 {
-    float angle_rad; /**< 转子机械角度, 单位 rad, 逆时针为正. 值域由协议决定: 达妙为
+    float angle_rad; /**< 反馈侧机械角度, 单位 rad, 逆时针为正. 值域由协议决定: 达妙为
                           ±P_MAX, DJI 编码器量为 [0, 2π). */
-    float speed_radps; /**< 转子转速, 单位 rad/s, 逆时针为正. */
+    float speed_radps; /**< 反馈侧角速度, 单位 rad/s, 逆时针为正. */
     float current_a; /**< 实际输出电流, 即转矩电流, 单位 A, 正值对应转速正方向. 型号不上报时置 0. */
-    float torque_n_m;     /**< 转子输出转矩, 单位 N·m, 型号不上报时置 0. */
+    float torque_n_m;     /**< 反馈侧转矩, 单位 N·m, 型号不上报时置 0. */
     int8_t temperature_c; /**< 电机温度, 单位 ℃. 由电调上报, 可用性取决于温度传感器与电调固件. */
     int8_t temperature_mos_c; /**< 驱动器 MOS 温度, 单位 ℃, 型号不上报时置 INT8_MIN. */
     uint8_t error_code;       /**< 驱动器故障码原值, 型号不上报时置 0. */
@@ -62,7 +62,7 @@ typedef enum
   *         描述符的 scalar_quantity 决定, 例如 M3508 是电流 A, 6020 电压版是电压 V.
   *         物理量到协议编码的换算由驱动在 encode_tx 内部完成, 调用方只给物理量.
   *         MIT 分支用于达妙等支持位置, 速度, 刚度, 阻尼与前馈转矩的协议.
-  * @note   MIT 的 position_rad 与 velocity_radps 为转子量, kp 与 kd 为协议约定单位,
+  * @note   MIT 的 position_rad 与 velocity_radps 与反馈同侧, kp 与 kd 为协议约定单位,
   *         torque_n_m 为前馈转矩, 单位 N·m.
   */
 typedef struct
@@ -81,8 +81,10 @@ typedef struct
         } mit;
         struct
         {
-            float position_rad;   /**< 目标位置, 单位 rad */
-            float velocity_radps; /**< 限速, 单位 rad/s */
+            float
+                position_rad; /**< 目标位置, 单位 rad, 与反馈角度同侧, 调用方按 feedback_ratio 换算 */
+            float
+                velocity_radps; /**< 限速, 单位 rad/s, 与反馈速度同侧, 调用方按 feedback_ratio 换算 */
         } position_velocity;
     } u;
 } NERV_Motor_ControlTypeDef;
@@ -123,18 +125,17 @@ typedef struct
     uint8_t id_max;                   /**< 设备 id 最大值 */
     uint8_t motors_per_frame;         /**< 单条控制帧控制的电机数量 */
     uint8_t frame_len;                /**< 控制帧与反馈帧数据长度, 单位 byte */
-    uint8_t fb_angle_off;             /**< 反馈帧转子角度字段偏移, uint16 大端 */
+    uint8_t fb_angle_off;             /**< 反馈帧角度字段偏移, uint16 大端 */
     uint8_t fb_speed_off;             /**< 反馈帧转速字段偏移, int16 大端 */
     uint8_t fb_current_off;           /**< 反馈帧实际输出电流字段偏移, int16 大端 */
     uint8_t fb_temperature_off;       /**< 反馈帧温度字段偏移, 无字段时取 NERV_MOTOR_FB_OFF_NONE */
-    uint16_t angle_count;             /**< 转子每圈编码数, 角度字段值域 0 到本值减 1 */
+    uint16_t angle_count;             /**< 反馈每圈编码数, 角度字段值域 0 到本值减 1 */
     float fb_control_full_scale;      /**< 反馈中控制量字段的满量程, 单位由协议族约定 */
     int16_t fb_control_cmd_limit_raw; /**< 反馈中控制量字段的编码满量程 */
     bool fb_bit_packed;               /**< true 表示反馈为协议自定义位打包, fb_*_off 不适用 */
     bool
         tx_id_offset_by_device; /**< true 表示控制帧标识符等于 tx_id_low 加设备 id (不减去 id_min), false 表示按低组/高组选帧 */
-    float torque_constant_n_m_per_a; /**< 手册给出的扭矩常数, 单位 N·m/A, 0 表示未提供 */
-    float rated_gear_ratio;          /**< 手册标称减速比, 无减速箱填 1, 必须大于 0 */
+    float torque_constant_n_m_per_a; /**< 输出轴侧扭矩常数, 单位 N·m/A, 每安培在输出轴产生的转矩 */
     bool fb_torque_present; /**< true 表示反馈直接给出转矩, false 表示由电流乘扭矩常数换算 */
     NERV_Motor_ControlKindTypeDef control_mode; /**< 控制模式, 决定 control 联合体的有效成员 */
     NERV_Motor_ScalarQuantityTypeDef

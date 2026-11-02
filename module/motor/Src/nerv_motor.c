@@ -51,7 +51,7 @@ static NERV_StatusTypeDef NERV_Motor_TransmitGroupFrame(NERV_Motor_InstanceTypeD
   * @retval NERV_OK 配置已绑定, 帧几何信息已缓存, 实例进入就绪状态.
   * @retval NERV_ERROR self 或 config 为 NULL, config 的 driver, driver 的 model,
   *         driver 的 ops 或 bus 为 NULL, 或 ops 的必需操作指针为空,
-  *         gear_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
+  *         feedback_ratio 不为大于 0 的有限值, over_temperature_c 为负或非有限值,
   *         control_limit 为负或非有限值, device_id 超出描述符的 id_min 到 id_max 范围,
   *         或帧几何信息的帧长为 0 或超过 NERV_FDCAN_DATA_MAX, 标识符超过 11 位.
   * @note   帧几何信息由驱动按配置的 device_id 与 master_id 派生, 反馈帧标识符的取值
@@ -81,7 +81,7 @@ NERV_StatusTypeDef NERV_Motor_Init(NERV_Motor_InstanceTypeDef *self,
         return NERV_ERROR;
     }
 
-    if (!isfinite(config->gear_ratio) || (config->gear_ratio <= 0.0f))
+    if (!isfinite(config->feedback_ratio) || (config->feedback_ratio <= 0.0f))
     {
         return NERV_ERROR;
     }
@@ -496,7 +496,8 @@ void NERV_Motor_ClearError(NERV_Motor_InstanceTypeDef *self, uint32_t mask)
   * @retval NERV_OK 目标已清零.
   * @retval NERV_ERROR self 为 NULL 或实例未初始化.
   * @note   零目标按型号描述符的 control_mode 生成: SCALAR 型号标量清零, MIT 型号
-  *         位置, 速度, 刚度, 阻尼与前馈转矩全部清零, 位置速度型号两个字段清零.
+  *         位置, 速度, 刚度, 阻尼与前馈转矩全部清零. 位置速度模式没有零力指令, 位置
+  *         取当前测量角以保持不动, 速度置零.
   * @note   控制输出由目标派生, 本函数不保存独立输出值. 零指令随下一个
   *         NERV_Motor_UpdateGroup 发送, 之间电调保持最后收到的指令. 需要立即输出时,
   *         调用本函数后立即执行一次 NERV_Motor_UpdateGroup.
@@ -517,8 +518,10 @@ NERV_StatusTypeDef NERV_Motor_EnterSafeState(NERV_Motor_InstanceTypeDef *self)
         return NERV_ERROR;
     }
 
+    const NERV_Motor_ModelTypeDef *model = self->config.driver->model;
+
     self->target_control      = (NERV_Motor_ControlTypeDef){0};
-    self->target_control.kind = self->config.driver->model->control_mode;
+    self->target_control.kind = model->control_mode;
     self->offline_armed       = false;
 
     return NERV_OK;
@@ -765,11 +768,6 @@ static NERV_StatusTypeDef NERV_Motor_ValidateModel(const NERV_Motor_ModelTypeDef
         return NERV_ERROR;
     }
 
-    if (!isfinite(model->rated_gear_ratio) || (model->rated_gear_ratio <= 0.0f))
-    {
-        return NERV_ERROR;
-    }
-
     if (!model->fb_bit_packed)
     {
         if (!isfinite(model->fb_control_full_scale) || (model->fb_control_full_scale <= 0.0f) ||
@@ -838,7 +836,7 @@ static float NERV_Motor_InvertSign(const NERV_Motor_InstanceTypeDef *self)
   * @param  self 实例指针, 必须已通过 NERV_Motor_Init 校验, 不得为 NULL.
   * @retval NERV_OK 换算完成, self->measurement 已写入.
   * @retval NERV_ERROR self 为 NULL.
-  * @note   角度与角速度除以 gear_ratio, 转矩按型号换算, 全部乘安装方向符号.
+  * @note   角度与角速度除以 feedback_ratio, 转矩按型号换算, 全部乘安装方向符号.
   * @note   角度不做归一化, 原样保留驱动解码出的值. 达妙反馈为 ±P_MAX 范围,
   *         DJI 的编码器量本身落在 [0, 2π).
   */
@@ -850,20 +848,19 @@ static NERV_StatusTypeDef NERV_Motor_ConvertFb(NERV_Motor_InstanceTypeDef *self)
     }
 
     const NERV_Motor_ModelTypeDef *model = self->config.driver->model;
-    const float gear_ratio               = self->config.gear_ratio;
+    const float feedback_ratio           = self->config.feedback_ratio;
     const float sign                     = NERV_Motor_InvertSign(self);
 
-    self->measurement.angle_rad   = self->fb.angle_rad / gear_ratio * sign;
-    self->measurement.speed_radps = self->fb.speed_radps / gear_ratio * sign;
+    self->measurement.angle_rad   = self->fb.angle_rad / feedback_ratio * sign;
+    self->measurement.speed_radps = self->fb.speed_radps / feedback_ratio * sign;
 
     if (model->fb_torque_present)
     {
-        self->measurement.torque_n_m = self->fb.torque_n_m * gear_ratio * sign;
+        self->measurement.torque_n_m = self->fb.torque_n_m * sign;
     }
     else
     {
-        self->measurement.torque_n_m = self->fb.current_a * model->torque_constant_n_m_per_a *
-                                       gear_ratio / model->rated_gear_ratio * sign;
+        self->measurement.torque_n_m = self->fb.current_a * model->torque_constant_n_m_per_a * sign;
     }
 
     self->measurement.temperature_c = self->fb.temperature_c;

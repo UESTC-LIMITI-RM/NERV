@@ -236,7 +236,7 @@ module/motor/driver/DJI/nerv_motor_driver_dji.c
 - [x] 模块公开头文件由 `NERV_USE_MOTOR` 条件编译, 模块关闭时 `nerv_motor_driver.h` 内容为空.
 - [x] 协议族驱动整体由 `NERV_USE_MOTOR` 与 `NERV_USE_MOTOR_<VENDOR>` 条件编译, 协议族关闭时驱动源文件不产生代码, `nerv_motor_driver.h` 中对应的驱动符号也不可见.
 - [x] `driver/DJI/nerv_motor_driver_dji.c`: DJI CAN 电调协议族实现与 M3508 (C620 电调), M2006 (C610 电调), GM6020 (电流与电压两种控制模式各一个驱动实例) 型号描述符, 帧 ID 分组, 显式大端编解码, 驱动层满量程限幅, 温度有符号透传与参数防御; 控制指令与反馈中控制量字段的编码在描述符中分开表达; 无温度字段的型号 (C610) 以 NERV_MOTOR_FB_OFF_NONE 表达, 解码置 INT8_MIN; 临时数值测试覆盖帧分组, 编解码字节布局与限幅.
-- [x] `nerv_motor.h`: 实例结构体, 配置结构体, 机构系测量值类型与对外函数声明. 配置字段含 `driver` 驱动绑定, `bus` 与 `device_id` 传输与标识, `gear_ratio` 减速比 (必须大于 0), `offline_ms` 离线判定阈值 (0 关闭), `over_temperature_c` 过温阈值 (0 关闭), `control_limit` 控制量物理量上限 (单位与型号的 `scalar_quantity` 一致, 0 不额外限幅), `invert_direction` 安装方向取反; 控制量为物理量, 单位由型号描述符的 `scalar_quantity` 决定, 编码换算由驱动在 `encode_tx` 内部完成. 接口: Init (带 config, 电机无硬件初始化阶段, 不设 Register), SetControl, UpdateGroup, OnRx, GetMeasurement, GetError, ClearError, EnterSafeState. 指令按总线与帧标识符分组发送, 同一总线上的同一标识符每周期只发一帧, 避免同组电调互相清零.
+- [x] `nerv_motor.h`: 实例结构体, 配置结构体, 机构系测量值类型与对外函数声明. 配置字段含 `driver` 驱动绑定, `bus` 与 `device_id` 传输与标识, `feedback_ratio` 位置速度换算系数 (必须大于 0), `offline_ms` 离线判定阈值 (0 关闭), `over_temperature_c` 过温阈值 (0 关闭), `control_limit` 控制量物理量上限 (单位与型号的 `scalar_quantity` 一致, 0 不额外限幅), `invert_direction` 安装方向取反; 控制量为物理量, 单位由型号描述符的 `scalar_quantity` 决定, 编码换算由驱动在 `encode_tx` 内部完成. 接口: Init (带 config, 电机无硬件初始化阶段, 不设 Register), SetControl, UpdateGroup, OnRx, GetMeasurement, GetError, ClearError, EnterSafeState. 指令按总线与帧标识符分组发送, 同一总线上的同一标识符每周期只发一帧, 避免同组电调互相清零.
 - [x] 反馈解析显式按字节偏移编码与解码, 不把协议缓冲区直接覆盖成结构体.
 - [x] 转速换算链路: 原始反馈值, 电机转速, 输出轴转速, 三级量纲分清, 单位换算只调用 `NERV_Utils_*`.
 - [x] 每个电机实例维护离线与过温两个错误位, 提供 `GetError` 与 `ClearError`. 过温检查以 `over_temperature_c` 大于 0 为前提; 反馈温度为电机温度, 由电调上报, 可用性取决于温度传感器与电调固件, 数据不可靠的机构关闭该检查, 仅剩电调自身的温度保护兜底.
@@ -265,7 +265,7 @@ module/chassis/Src/nerv_chassis.c
 - [x] 控制链为串级速控: `NERV_Chassis_RampVelocity` 把目标速度限幅为规划速度, `NERV_Chassis_SolveForward` 由各轮实测角速度正解机体系速度, `NERV_Chassis_ComputeVelocityCommand` 车体速度环输出修正后的速度指令, `NERV_Chassis_SolveWheelSpeed` 逆解为各轮目标角速度, 每轮速度环输出电流, 经 `NERV_Motor_SetControl` 下发, `NERV_Motor_UpdateGroup` 完成发送. 不设力分解, 不设舵向电机.
 - [x] 全向轮解算按 4 轮布局: 轮号 0 到 3 依次为左前, 左后, 右后, 右前, 编号方向为绕底盘一周, 左前起始, 符号约定写入头文件契约.
 - [x] 里程计先推进角度再更新位置, 角度用 `NERV_Math_Wrap` 归一化到 [-π, π). 提供 `NERV_Chassis_SetOdometry` 供上层把视觉或惯性融合结果回写校正; 里程计功能可用编译期宏 `NERV_USE_CHASSIS_ODOMETRY` 整体裁剪, 默认 `NERV_DISABLE`.
-- [x] 斜坡规划: 目标速度按配置的平移与旋转加速度限幅平滑趋近 (分量独立限变化率, 反向必过零, 0 限幅直通). 控制周期按 `__NERV_CHASSIS_MAX_DT_S` 与 `__NERV_CHASSIS_MIN_DT_S` 钳位, 避免长时间停更后一次性推进一大步.
+- [x] 斜坡规划: 目标速度按配置的平移与旋转加速度限幅平滑趋近 (分量独立限变化率, 反向必过零, 0 限幅直通). 控制周期按 `NERV_INNER_CHASSIS_MAX_DT_S` 与 `NERV_INNER_CHASSIS_MIN_DT_S` 钳位, 避免长时间停更后一次性推进一大步.
 - [x] 错误位覆盖运动学异常与轮离线.
 - [x] 严重故障置错误位并通知已注册回调, 故障路径不调用日志宏.
 - [x] 不提供坡度前馈, 阻力前馈与裁判系统功率限制接口. 相关配置开关已从 `config.h` 移除, 后续若需要功率控制另立任务.
@@ -283,11 +283,11 @@ module/shoot/Inc/nerv_shoot_def.h
 module/shoot/Src/nerv_shoot.c
 ```
 
-- [ ] 云台为四轴结构: 大 yaw, 小 yaw, pitch, roll 依次串联. 两个 yaw 轴平行且都竖直, 安装位置不同, 总偏航角等于两者之和. 轴数宏取 `NERV_GIMBAL_AXIS_COUNT_4`, 角度数组长度由该宏推导.
-- [ ] 云台目标角与当前角位于 `[-π, π)`, 越限置 `NERV_ERR_GIMBAL_LIMIT`.
+- [x] 云台为四轴结构: 大 yaw, 小 yaw, pitch, roll 依次串联. 两个 yaw 轴平行且都竖直, 安装位置不同, 总偏航角等于两者之和. 轴数宏取 `NERV_GIMBAL_AXIS_COUNT_4`, 角度数组长度由该宏推导.
+- [x] 云台目标角与当前角位于 `[-π, π)`, 越限置 `NERV_ERR_GIMBAL_LIMIT`. 大 yaw 以角速度目标驱动, 小 yaw 与 pitch, roll 以角度目标驱动, 角度限位在 `NERV_Gimbal_SetTarget` 与 `UpdateGroup` 各校验一次.
 - [ ] 发射按摩擦轮与进弹机构拆分, 摩擦轮目标转速, 进弹速度与弹仓状态各自独立.
 - [ ] 发射实现卡弹与离线检测, 状态迁移规则写在头文件契约中.
-- [ ] 两个模块都提供 `EnterSafeState`, 满足 `AGENTS.md` 第 17.4 节的安全状态清单.
+- [x] 云台提供 `EnterSafeState`, 各轴目标归零并立即下发一次; 彻底停机由调用方另行调用 `NERV_Motor_Disable`. 发射模块待实现.
 - [ ] 若引入 PID, 积分项放在模块私有状态, 安全状态与误差超限时清零.
 
 ### M7 `module/safety/`

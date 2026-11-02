@@ -386,7 +386,7 @@ float NERV_Utils_RadpsToRpm(float radps);
 | 位掩码与宏常量       | `NERV_<MODULE>_<NAME>`                                         | `NERV_ERR_MOTOR_OFFLINE`                         |
 | 用户可覆盖的默认值宏 | `NERV_<MODULE>_<NAME>`, 用 `#ifndef` 包裹                      | `NERV_MOTOR_MAX_CURRENT_MA`                      |
 | 用户禁止覆盖的推导宏 | `NERV_<MODULE>_<NAME>`, 用 `#if defined(...)` 与 `#error` 保护 | `NERV_CHASSIS_WHEEL_COUNT`                       |
-| 内部实现宏           | `__NERV_<MODULE>_<NAME>`, 仅限 `*_priv.h` 或 `.c`              | `__NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT`        |
+| 内部实现宏           | `NERV_INNER_<MODULE>_<NAME>`, 仅限 `*_priv.h` 或 `.c`              | `NERV_INNER_CHASSIS_INTERNAL_MAX_WHEEL_COUNT`        |
 | 内部函数             | `static` 修饰, 仍使用 `NERV_` 前缀                             | `static void NERV_Chassis_UpdateOdometry(...)`   |
 | 内部变量             | 小写下划线, 带单位后缀                                         | `chassis_cfg`, `speed_radps`, `dt_s`             |
 | 函数指针成员         | 动词开头, 语义简短                                             | `init`, `update`, `set_ref`                      |
@@ -714,12 +714,12 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 #### 7.8.3 公开宏与内部宏
 
 - 公开宏使用 `NERV_<MODULE>_<NAME>`.
-- 内部宏使用 `__NERV_<MODULE>_<NAME>`, 仅允许出现在模块 `.c` 中.
-- 公开头文件不得暴露 `__NERV_` 宏.
+- 内部宏使用 `NERV_INNER_<MODULE>_<NAME>`, 仅允许出现在模块 `.c` 中.
+- 公开头文件不得暴露 `NERV_INNER_` 宏.
 
 ```c
 /* module/motor/Src/nerv_motor.c */
-#define __NERV_MOTOR_INTERNAL_MAX_CURRENT_MA  60000U
+#define NERV_INNER_MOTOR_INTERNAL_MAX_CURRENT_MA  60000U
 ```
 
 #### 7.8.4 用户可覆盖的默认值宏
@@ -765,7 +765,7 @@ static inline NERV_StatusTypeDef NERV_Ptr_CheckNotNull(const void *p)
 /* 修改必须同步更新 AGENTS.md 与遥测协议定义.                               */
 /* ========================================================================== */
 
-#define __NERV_CHASSIS_INTERNAL_MAX_WHEEL_COUNT 4U
+#define NERV_INNER_CHASSIS_INTERNAL_MAX_WHEEL_COUNT 4U
 
 /* ========================================================================== */
 /* 核心契约定义区结束                                                       */

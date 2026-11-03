@@ -106,7 +106,7 @@
   * @brief 云台模块裁剪开关.
   * @note  取 NERV_ENABLE 或 NERV_DISABLE.
   */
-#define NERV_USE_GIMBAL NERV_DISABLE
+#define NERV_USE_GIMBAL NERV_ENABLE
 #endif
 
 #if (NERV_USE_GIMBAL != NERV_ENABLE) && (NERV_USE_GIMBAL != NERV_DISABLE)

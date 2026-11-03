@@ -11,6 +11,7 @@ add_library(nerv STATIC
     module/motor/driver/DM/nerv_motor_driver_dm.c
     module/motor/driver/DJI/nerv_motor_driver_dji.c
     module/chassis/Src/nerv_chassis.c
+    module/gimbal/Src/nerv_gimbal.c
     config/Src/config_check.c
 )
 
@@ -23,6 +24,7 @@ target_include_directories(nerv PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/module/motor/driver/DM
     ${CMAKE_CURRENT_SOURCE_DIR}/module/motor/driver/DJI
     ${CMAKE_CURRENT_SOURCE_DIR}/module/chassis/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/module/gimbal/Inc
 )
 
 target_compile_features(nerv PUBLIC c_std_11)

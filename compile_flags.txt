@@ -7,5 +7,6 @@
 -Imodule/motor/driver/DM
 -Imodule/motor/driver/DJI
 -Imodule/chassis/Inc
+-Imodule/gimbal/Inc
 -DNERV_PLATFORM=NERV_PLATFORM_CUSTOM
 -DNERV_CHASSIS_TYPE=NERV_CHASSIS_TYPE_OMNI

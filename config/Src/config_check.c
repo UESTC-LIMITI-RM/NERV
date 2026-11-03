@@ -69,6 +69,10 @@ _Static_assert((NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_MECANUM) ||
                    (NERV_CHASSIS_TYPE == NERV_CHASSIS_TYPE_OMNI),
                "NERV_CHASSIS_TYPE must select a supported chassis.");
 
+#if (NERV_USE_MOTOR != NERV_ENABLE)
+#error "NERV_USE_CHASSIS requires NERV_USE_MOTOR."
+#endif
+
 #endif /* NERV_USE_CHASSIS */
 
 /* 云台配置. 模块关闭时不检查其专属宏. */
@@ -79,6 +83,10 @@ _Static_assert(NERV_GIMBAL_AXIS_COUNT_4 == 4U, "NERV_GIMBAL_AXIS_COUNT_4 must be
 
 _Static_assert(NERV_GIMBAL_AXIS_COUNT == NERV_GIMBAL_AXIS_COUNT_4,
                "NERV_GIMBAL_AXIS_COUNT must be NERV_GIMBAL_AXIS_COUNT_4.");
+
+#if (NERV_USE_MOTOR != NERV_ENABLE)
+#error "NERV_USE_GIMBAL requires NERV_USE_MOTOR."
+#endif
 
 #endif /* NERV_USE_GIMBAL */
 
@@ -139,7 +147,7 @@ _Static_assert(NERV_ERR_SAFETY_BITS_MASK == 0x00060000U,
 
 /** @cond INTERNAL */
 
-#define NERV_INNER_CONFIG_CHECK_ERROR_BITS_MASK                                              \
+#define NERV_INNER_CONFIG_CHECK_ERROR_BITS_MASK                                          \
     (NERV_ERR_MOTOR_BITS_MASK | NERV_ERR_CHASSIS_BITS_MASK | NERV_ERR_GIMBAL_BITS_MASK | \
      NERV_ERR_SHOOT_BITS_MASK | NERV_ERR_SAFETY_BITS_MASK)
 
@@ -149,7 +157,7 @@ _Static_assert(NERV_INNER_CONFIG_CHECK_ERROR_BITS_MASK == 0x0017FE00U,
 
 /* 错误码的位号与位范围必须与定义一致. */
 
-#define NERV_INNER_CONFIG_CHECK_ERROR(_code, _bit, _mask)           \
+#define NERV_INNER_CONFIG_CHECK_ERROR(_code, _bit, _mask)       \
     _Static_assert(((uint32_t)(_code) == NERV_ERR_BIT(_bit)) && \
                        (((uint32_t)(_code) & ~(_mask)) == 0U),  \
                    #_code " must use its assigned bit and bit range.")

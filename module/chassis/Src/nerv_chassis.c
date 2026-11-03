@@ -661,7 +661,7 @@ NERV_StatusTypeDef NERV_Chassis_Update(NERV_Chassis_InstanceTypeDef *self, uint3
 
     error_before = self->error;
 
-    dt_s = (float)(now_ms - self->last_update_ms) / 1000.0f;
+    dt_s = (float)(now_ms - self->last_update_ms) / NERV_MATH_MS_PER_S;
 
     if (dt_s > NERV_INNER_CHASSIS_MAX_DT_S)
     {

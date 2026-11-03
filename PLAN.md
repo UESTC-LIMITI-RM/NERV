@@ -276,7 +276,6 @@ module/chassis/Src/nerv_chassis.c
 
 ```
 module/gimbal/Inc/nerv_gimbal.h
-module/gimbal/Inc/nerv_gimbal_def.h
 module/gimbal/Src/nerv_gimbal.c
 module/shoot/Inc/nerv_shoot.h
 module/shoot/Inc/nerv_shoot_def.h

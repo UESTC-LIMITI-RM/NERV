@@ -17,6 +17,10 @@
  * 模块裁剪为 NERV_DISABLE 时, 该模块的专属配置宏不定义.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 平台选择. */
 
 /**
@@ -335,5 +339,9 @@
 #endif
 
 #endif /* NERV_USE_LOG */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NERV_CONFIG_H */
